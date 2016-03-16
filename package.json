@@ -1,0 +1,21 @@
+{
+  "name": "easy-fix",
+  "version": "0.0.1",
+  "description": "easily capture & replay mock test data",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git@gecgithub01.walmart.com:store-services/easy-fix.git"
+  },
+  "keywords": [
+    "test",
+    "mock",
+    "sinon",
+    "fixture"
+  ],
+  "author": "Dan Rathbone (rathbone1200cc)",
+  "license": "ISC",
+  "dependencies": {
+    "repo-standards": "git+ssh://git@gecgithub01.walmart.com:store-services/repo-standards"
+  }
+}
