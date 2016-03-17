@@ -29,16 +29,18 @@ exports.wrapAsyncMethod = function (obj, method, bucket) {
     const hashKey = crypto.createHash('sha256').update(argStr).digest('hex');
     const argPath = path.join(captureDir, bucket, hashKey + '-args.json');
     const responsePath = path.join(captureDir, bucket, hashKey + '-response.json');
-    const callback = callingArgs[1];
+    // REFACTOR: determine how to generate nicer file names.
+    const callback = callingArgs[callingArgs.length - 1];
     if (mode === modes.capture) {
       fs.writeFileSync(argPath, argStr);
-      originalFn(callingArgs[0], function () {
+      callingArgs[callingArgs.length - 1] = function () {
         const callbackArgs = Array.apply(null, arguments);
         fs.writeFileSync(
           responsePath,
           JSON.stringify(callbackArgs, null, '  '));
         callback.apply(self, callbackArgs);
-      });
+      };
+      originalFn.apply(self, callingArgs);
       return;
     }
 
