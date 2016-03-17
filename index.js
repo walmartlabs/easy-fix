@@ -12,10 +12,10 @@ const modes = {
   capture: 'capture',
   replay: 'replay'
 };
-const mode = modes[process.env.TEST_MODE || modes.replay];
 
 exports.wrapAsyncMethod = function (obj, method, bucket) {
   const originalFn = obj[method];
+  const mode = modes[process.env.TEST_MODE || modes.replay];
 
   const stub = sinon.stub(obj, method, function () {
     const callingArgs = Array.apply(null, arguments);
