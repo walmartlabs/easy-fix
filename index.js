@@ -5,7 +5,6 @@ require('repo-standards').exposeTestGlobals();
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const captureDir = 'test/data';
 
 const modes = {
   live: 'live',
@@ -13,25 +12,27 @@ const modes = {
   replay: 'replay'
 };
 
-exports.wrapAsyncMethod = function (obj, method, bucket) {
+exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
-  const mode = modes[process.env.TEST_MODE || modes.replay];
+  const options = {};
+  options.bucket = typeof optionsArg === 'string' ? optionsArg : optionsArg.bucket || 'test/data';
+  options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
 
   const stub = sinon.stub(obj, method, function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
-    if (mode === modes.live) { // no fixtures, no problems
+    if (options.mode === modes.live) { // no fixtures, no problems
       return originalFn.apply(self, callingArgs);
     }
 
     const argStr = JSON.stringify(callingArgs, null, '  ');
     const hashKey = crypto.createHash('sha256').update(argStr).digest('hex');
-    const argPath = path.join(captureDir, bucket, hashKey + '-args.json');
-    const responsePath = path.join(captureDir, bucket, hashKey + '-response.json');
+    const argPath = path.join(options.bucket, hashKey + '-args.json');
+    const responsePath = path.join(options.bucket, hashKey + '-response.json');
     // REFACTOR: determine how to generate nicer file names.
     const callback = callingArgs[callingArgs.length - 1];
-    if (mode === modes.capture) {
+    if (options.mode === modes.capture) {
       fs.writeFileSync(argPath, argStr);
       callingArgs[callingArgs.length - 1] = function () {
         const callbackArgs = Array.apply(null, arguments);

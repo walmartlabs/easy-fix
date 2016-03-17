@@ -20,6 +20,9 @@
   "author": "Dan Rathbone (rathbone1200cc)",
   "license": "ISC",
   "dependencies": {
+    "sinon": "1.17.3"
+  },
+  "devDependencies": {
     "repo-standards": "git+ssh://git@gecgithub01.walmart.com:store-services/repo-standards"
   }
 }
