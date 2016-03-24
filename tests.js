@@ -56,7 +56,8 @@ describe('wrapAsyncMethod (live mode)', function () {
   beforeEach(() => {
     thingToTest.resetState();
     stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
-      mode: 'live'
+      mode: 'live',
+      dir: 'tmp'
     });
   });
   afterEach(() => {
@@ -71,7 +72,7 @@ describe('wrapAsyncMethod (capture mode)', function () {
     thingToTest.resetState();
     stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'capture',
-      bucket: 'tmp'
+      dir: 'tmp'
     });
   });
   afterEach(() => {
@@ -86,7 +87,7 @@ describe('wrapAsyncMethod (replay mode)', function () {
     thingToTest.resetState();
     stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'replay',
-      bucket: 'tmp'
+      dir: 'tmp'
     });
   });
   afterEach(() => {
