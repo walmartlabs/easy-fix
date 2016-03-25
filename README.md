@@ -67,3 +67,9 @@ Options
 *  "mode": override the TEST_MODE environment variable.  In the absence of the TEST_MODE and this option, the mode defaults to "replay".
 *  "callbackSwap": allow an alternate function to monkey-patch the target function callbacks.  If the target function under test does not follow node convention of having a callback as it's last agument, you'll need to provide a custom function for this option.
 *  "argumentSerializer":  allow an alternate serialization to JSON.stringify on the target function arguments.  This is useful for deduplicating test data where you expect the arguments will be different for each call (perhaps with a timestamp or uuid) but do not require a unique response.
+
+Real-world examples
+-------------------
+
+Walmart Scan & Go [integration test setup](https://gecgithub01.walmart.com/store-services/walmart-sng/blob/4c10872ea93f736e0c14b33988d31a38d3e9686b/test/int/capture.js)
+Isd-client [integration test setup](https://gecgithub01.walmart.com/store-services/isd-client/blob/6bae3f8bf141f8b0f94045f47a285d77e487b9d8/test/int/capture.js)
