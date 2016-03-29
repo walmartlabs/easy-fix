@@ -3,6 +3,7 @@
 
 require('repo-standards').exposeTestGlobals();
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -55,12 +56,16 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       const callbackArgs = Array.apply(null, arguments);
       fs.writeFileSync(
         responsePath,
-        JSON.stringify(callbackArgs, null, '  '));
+        JSON.stringify(callbackArgs, null, '  ') + os.EOL,
+        'utf8');
       origCallback.apply(this, callbackArgs);
     }]);
 
     if (options.mode === modes.capture) {
-      fs.writeFileSync(argPath, argStr);
+      fs.writeFileSync(
+        argPath,
+        argStr + os.EOL,
+        'utf8');
       originalFn.apply(self, callingArgs);
       return;
     }
