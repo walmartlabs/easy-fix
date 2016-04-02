@@ -1,7 +1,7 @@
 /* globals sinon */
 'use strict';
 
-require('repo-standards').exposeTestGlobals();
+const sinon = require('sinon');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
