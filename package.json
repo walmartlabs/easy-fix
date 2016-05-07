@@ -20,6 +20,7 @@
   "author": "Dan Rathbone (rathbone1200cc)",
   "license": "ISC",
   "dependencies": {
+    "json-stringify-safe": "5.0.1",
     "sinon": "1.17.3"
   },
   "devDependencies": {

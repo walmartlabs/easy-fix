@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const stringify = require('json-stringify-safe');
 
 let sandbox = sinon.sandbox.create();
 
@@ -35,7 +36,8 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     return origCallback;
   };
   options.argumentSerializer = optionsArg.argumentSerializer || function (args) {
-    return JSON.stringify(args, null, '  ');
+    debugger;
+    return stringify(args, null, '  ');
   };
 
   const stub = sinon.stub(obj, method, function () {
@@ -56,7 +58,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       const callbackArgs = Array.apply(null, arguments);
       fs.writeFileSync(
         responsePath,
-        JSON.stringify(callbackArgs, null, '  ') + os.EOL,
+        stringify(callbackArgs, null, '  ') + os.EOL,
         'utf8');
       origCallback.apply(this, callbackArgs);
     }]);
