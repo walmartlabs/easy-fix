@@ -36,7 +36,6 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     return origCallback;
   };
   options.argumentSerializer = optionsArg.argumentSerializer || function (args) {
-    debugger;
     return stringify(args, null, '  ');
   };
 
@@ -58,7 +57,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       const callbackArgs = Array.apply(null, arguments);
       fs.writeFileSync(
         responsePath,
-        stringify(callbackArgs, null, '  ') + os.EOL,
+        argStr + os.EOL,
         'utf8');
       origCallback.apply(this, callbackArgs);
     }]);
