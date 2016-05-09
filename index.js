@@ -6,7 +6,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const stringify = require('json-stringify-safe');
 
 let sandbox = sinon.sandbox.create();
 
@@ -14,6 +13,44 @@ const modes = {
   live: 'live',
   capture: 'capture',
   replay: 'replay'
+};
+
+/**
+ * Safe JSON Serializer will not fail in the face of circular references
+ * Derived heavily from @isaacs ISC Licensed json-stringify-safe repo
+ * https://github.com/isaacs/json-stringify-safe/blob/master/stringify.js
+ */
+const stringifySafeSerializer = (replacer, cycleReplacer) => {
+  let stack = [];
+  let keys = [];
+
+  if (!cycleReplacer) {
+    cycleReplacer = (key, value) => {
+      if (stack[0] === value) {
+        return '[Circular ~]';
+      }
+      return '[Circular ~.' + keys.slice(0, stack.indexOf(value)).join('.') + ']';
+    };
+  }
+
+  return function (key, value) {
+    if (stack.length > 0) {
+      const thisPos = stack.indexOf(this);
+      ~thisPos ? stack.splice(thisPos + 1) : stack.push(this);
+      ~thisPos ? keys.splice(thisPos, Infinity, key) : keys.push(key);
+      if (~stack.indexOf(value)) {
+        value = cycleReplacer.call(this, key, value);
+      }
+    } else {
+      stack.push(value);
+    }
+
+    return replacer ? replacer.call(this, key, value) : value;
+  };
+};
+
+const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
+  return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
 
 exports.restore = function () {
@@ -36,7 +73,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     return origCallback;
   };
   options.argumentSerializer = optionsArg.argumentSerializer || function (args) {
-    return stringify(args, null, '  ');
+    return stringifySafe(args, null, '  ');
+  };
+  options.responseSerializer = optionsArg.argumentSerializer || function (args) {
+    return stringifySafe(args, null, '  ');
   };
 
   const stub = sinon.stub(obj, method, function () {
@@ -57,7 +97,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       const callbackArgs = Array.apply(null, arguments);
       fs.writeFileSync(
         responsePath,
-        argStr + os.EOL,
+        options.responseSerializer(callbackArgs) + os.EOL,
         'utf8');
       origCallback.apply(this, callbackArgs);
     }]);
