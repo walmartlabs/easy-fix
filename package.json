@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "gulp": "gulp",
+    "pretest": "gulp lint",
     "test": "mocha tests.js"
   },
   "repository": {
