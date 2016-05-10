@@ -1,6 +1,6 @@
 {
   "name": "@walmart/easy-fix",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "easily capture & replay mock test data",
   "main": "index.js",
   "scripts": {
