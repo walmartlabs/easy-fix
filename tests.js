@@ -1,4 +1,5 @@
 /* globals describe, beforeEach, afterEach, it, expect */
+  
 'use strict';
 
 require('repo-standards').exposeTestGlobals();

@@ -1,4 +1,3 @@
-/* globals sinon */
 'use strict';
 
 const sinon = require('sinon');
