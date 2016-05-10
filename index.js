@@ -75,7 +75,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.argumentSerializer = optionsArg.argumentSerializer || function (args) {
     return stringifySafe(args, null, '  ');
   };
-  options.responseSerializer = optionsArg.argumentSerializer || function (args) {
+  options.responseSerializer = optionsArg.responseSerializer || function (args) {
     return stringifySafe(args, null, '  ');
   };
 
