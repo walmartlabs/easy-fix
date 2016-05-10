@@ -78,6 +78,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.responseSerializer = optionsArg.responseSerializer || function (args) {
     return stringifySafe(args, null, '  ');
   };
+  options.responsePath = optionsArg.responsePath;
 
   const stub = sinon.stub(obj, method, function () {
     const callingArgs = Array.apply(null, arguments);
@@ -91,7 +92,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, 12);
     const basePath = path.join(options.dir, options.prefix + '-' + hashKey);
     const argPath = basePath + '-args.json';
-    const responsePath = basePath + '-response.json';
+    const responsePath = options.responsePath || basePath + '-response.json';
     // REFACTOR: determine how to generate nicer file names.
     const origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
       const callbackArgs = Array.apply(null, arguments);
