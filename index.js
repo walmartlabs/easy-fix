@@ -1,12 +1,9 @@
 'use strict';
 
-const sinon = require('sinon');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-
-let sandbox = sinon.sandbox.create();
 
 const modes = {
   live: 'live',
@@ -52,15 +49,7 @@ const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
 
-exports.restore = function () {
-  if (sandbox) {
-    sandbox.restore();
-  }
-  sandbox = sinon.sandbox.create();
-};
-
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
-  sandbox = sandbox || sinon.sandbox.create();
   const originalFn = obj[method];
   const options = {};
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
@@ -79,7 +68,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   };
   options.responsePath = optionsArg.responsePath;
 
-  const stub = sinon.stub(obj, method, function () {
+  const stub = function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
@@ -117,7 +106,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     process.nextTick(() => {
       origCallback.apply(self, cannedJson);
     });
-  });
+  };
+  stub.restore = function () {
+    obj[method] = originalFn;
+  };
+  obj[method] = stub;
   return stub;
 };
 

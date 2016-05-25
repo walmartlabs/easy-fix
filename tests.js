@@ -1,8 +1,9 @@
-/* globals describe, beforeEach, afterEach, it, expect */
-  
+/* globals describe, beforeEach, afterEach, it */
+
 'use strict';
 
-require('repo-standards').exposeTestGlobals();
+const sinon = require('sinon');
+const expect = require('chai').expect;
 const easyFix = require('./index');
 
 const thingToTest = {
@@ -26,19 +27,16 @@ const thingToTest = {
   }
 };
 
-let stub;
+let easyFixStub;
+let sinonStub;
 const runSharedTests = (expectTargetFnCalls) => {
-  it('returns a sinon stub', function () {
-    expect(stub.callCount).to.be.a('number');
-    expect(stub.withArgs).to.be.a('function');
-  });
 
   it('falls back onto wrapped method', function (done) {
     thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(stub.callCount).to.equal(1);
+      expect(sinonStub.callCount).to.equal(1);
       done();
     });
   });
@@ -49,7 +47,7 @@ const runSharedTests = (expectTargetFnCalls) => {
         expect(secondState).to.equal(2);
         const expectedTargetState = expectTargetFnCalls ? 2 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
-        expect(stub.callCount).to.equal(2);
+        expect(sinonStub.callCount).to.equal(2);
         done();
       });
     });
@@ -62,7 +60,7 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(stub.callCount).to.equal(1);
+      expect(sinonStub.callCount).to.equal(1);
       done();
     });
   });
@@ -71,13 +69,15 @@ const runSharedTests = (expectTargetFnCalls) => {
 describe('wrapAsyncMethod (live mode)', function () {
   beforeEach(() => {
     thingToTest.resetState();
-    stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'live',
       dir: 'tmp'
     });
+    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    stub.restore();
+    sinonStub.restore();
+    easyFixStub.restore();
   });
 
   runSharedTests(true);
@@ -86,13 +86,15 @@ describe('wrapAsyncMethod (live mode)', function () {
 describe('wrapAsyncMethod (capture mode)', function () {
   beforeEach(() => {
     thingToTest.resetState();
-    stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'capture',
       dir: 'tmp'
     });
+    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    stub.restore();
+    sinonStub.restore();
+    easyFixStub.restore();
   });
 
   runSharedTests(true);
@@ -101,13 +103,15 @@ describe('wrapAsyncMethod (capture mode)', function () {
 describe('wrapAsyncMethod (replay mode)', function () {
   beforeEach(() => {
     thingToTest.resetState();
-    stub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'replay',
       dir: 'tmp'
     });
+    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    stub.restore();
+    sinonStub.restore();
+    easyFixStub.restore();
   });
 
   runSharedTests(false);
