@@ -28,7 +28,6 @@ const thingToTest = {
 };
 
 let easyFixStub;
-let sinonStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', function (done) {
@@ -36,7 +35,7 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(sinonStub.callCount).to.equal(1);
+      expect(easyFixStub.callCount).to.equal(1);
       done();
     });
   });
@@ -47,7 +46,7 @@ const runSharedTests = (expectTargetFnCalls) => {
         expect(secondState).to.equal(2);
         const expectedTargetState = expectTargetFnCalls ? 2 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
-        expect(sinonStub.callCount).to.equal(2);
+        expect(easyFixStub.callCount).to.equal(2);
         done();
       });
     });
@@ -60,7 +59,7 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(sinonStub.callCount).to.equal(1);
+      expect(easyFixStub.callCount).to.equal(1);
       done();
     });
   });
@@ -71,12 +70,11 @@ describe('wrapAsyncMethod (live mode)', function () {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'live',
+      sinon: sinon,
       dir: 'tmp'
     });
-    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    sinonStub.restore();
     easyFixStub.restore();
   });
 
@@ -88,12 +86,11 @@ describe('wrapAsyncMethod (capture mode)', function () {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'capture',
+      sinon: sinon,
       dir: 'tmp'
     });
-    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    sinonStub.restore();
     easyFixStub.restore();
   });
 
@@ -105,12 +102,11 @@ describe('wrapAsyncMethod (replay mode)', function () {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'replay',
+      sinon: sinon,
       dir: 'tmp'
     });
-    sinonStub = sinon.stub(thingToTest, 'incStateNextTick', thingToTest.incStateNextTick);
   });
   afterEach(() => {
-    sinonStub.restore();
     easyFixStub.restore();
   });
 

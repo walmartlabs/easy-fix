@@ -67,8 +67,9 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     return stringifySafe(args, null, '  ');
   };
   options.responsePath = optionsArg.responsePath;
+  options.sinon = optionsArg.sinon;
 
-  const stub = function () {
+  const wrapper = function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
@@ -107,10 +108,14 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       origCallback.apply(self, cannedJson);
     });
   };
-  stub.restore = function () {
+
+  if (options.sinon) {
+    return options.sinon.stub(obj, method, wrapper);
+  }
+  obj[method] = wrapper;
+  wrapper.restore = function () {
     obj[method] = originalFn;
   };
-  obj[method] = stub;
-  return stub;
+  return wrapper;
 };
 
