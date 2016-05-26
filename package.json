@@ -4,8 +4,7 @@
   "description": "easily capture & replay mock test data",
   "main": "index.js",
   "scripts": {
-    "gulp": "gulp",
-    "pretest": "gulp lint",
+    "lint": "eslint index.js tests.js",
     "test": "mocha tests.js"
   },
   "repository": {
@@ -15,15 +14,18 @@
   "keywords": [
     "test",
     "mock",
-    "sinon",
     "fixture"
   ],
   "author": "Dan Rathbone (rathbone1200cc)",
   "license": "ISC",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
-    "sinon": "1.17.3",
-    "repo-standards": "git+ssh://git@gecgithub01.walmart.com:store-services/repo-standards"
+    "babel-eslint": "6.0.4",
+    "chai": "3.5.0",
+    "eslint": "2.10.2",
+    "eslint-config-defaults": "9.0.0",
+    "eslint-plugin-filenames": "1.0.0",
+    "mocha": "2.5.3",
+    "sinon": "1.17.3"
   }
 }
