@@ -1,13 +1,9 @@
-/* globals sinon */
 'use strict';
 
-const sinon = require('sinon');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-
-let sandbox = sinon.sandbox.create();
 
 const modes = {
   live: 'live',
@@ -53,15 +49,7 @@ const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
 
-exports.restore = function () {
-  if (sandbox) {
-    sandbox.restore();
-  }
-  sandbox = sinon.sandbox.create();
-};
-
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
-  sandbox = sandbox || sinon.sandbox.create();
   const originalFn = obj[method];
   const options = {};
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
@@ -78,8 +66,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.responseSerializer = optionsArg.responseSerializer || function (args) {
     return stringifySafe(args, null, '  ');
   };
+  options.responsePath = optionsArg.responsePath;
+  options.sinon = optionsArg.sinon;
 
-  const stub = sinon.stub(obj, method, function () {
+  const wrapper = function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
@@ -91,7 +81,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, 12);
     const basePath = path.join(options.dir, options.prefix + '-' + hashKey);
     const argPath = basePath + '-args.json';
-    const responsePath = basePath + '-response.json';
+    const responsePath = options.responsePath || basePath + '-response.json';
     // REFACTOR: determine how to generate nicer file names.
     const origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
       const callbackArgs = Array.apply(null, arguments);
@@ -117,7 +107,15 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     process.nextTick(() => {
       origCallback.apply(self, cannedJson);
     });
-  });
-  return stub;
+  };
+
+  if (options.sinon) {
+    return options.sinon.stub(obj, method, wrapper);
+  }
+  obj[method] = wrapper;
+  wrapper.restore = function () {
+    obj[method] = originalFn;
+  };
+  return wrapper;
 };
 
