@@ -1,6 +1,6 @@
 {
   "name": "@walmart/easy-fix",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "easily capture & replay mock test data",
   "main": "index.js",
   "scripts": {
@@ -21,9 +21,9 @@
   "author": "Dan Rathbone (rathbone1200cc)",
   "license": "ISC",
   "dependencies": {
-    "sinon": "1.17.3"
   },
   "devDependencies": {
+    "sinon": "1.17.3",
     "repo-standards": "git+ssh://git@gecgithub01.walmart.com:store-services/repo-standards"
   }
 }
