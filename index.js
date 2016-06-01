@@ -11,6 +11,8 @@ const modes = {
   replay: 'replay'
 };
 
+const niceErrMsg = 'This test (in replay mode) could not read the expected mock data.  If you have not already, try running this test in capture mode to generate new test fixtures.  If you continue to see this error, a likely cause is differing (frequently changing) argument for the wrapped asynchronous task.  This can be mitigated by defining an argumentSerializer option that ignores the frequently-changing argument.'; // eslint-disable-line max-len
+
 /**
  * Safe JSON Serializer will not fail in the face of circular references
  * Derived heavily from @isaacs ISC Licensed json-stringify-safe repo
@@ -102,9 +104,14 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     }
 
     // mode is replay
-    const cannedResponse = fs.readFileSync(responsePath);
-    const cannedJson = JSON.parse(cannedResponse);
-    process.nextTick(() => {
+    fs.readFile(responsePath, function (err, cannedResponse) {
+      if (err) {
+        if (err.code === 'ENOENT') {
+          throw new Error(niceErrMsg);
+        }
+        throw err;
+      }
+      const cannedJson = JSON.parse(cannedResponse);
       origCallback.apply(self, cannedJson);
     });
   };
