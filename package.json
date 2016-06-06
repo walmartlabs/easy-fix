@@ -22,9 +22,9 @@
   "devDependencies": {
     "babel-eslint": "6.0.4",
     "chai": "3.5.0",
-    "eslint": "2.10.2",
+    "eslint": "1.10.3",
     "eslint-config-defaults": "9.0.0",
-    "eslint-plugin-filenames": "1.0.0",
+    "eslint-plugin-filenames": "0.2.0",
     "mocha": "2.5.3",
     "sinon": "1.17.3"
   }

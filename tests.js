@@ -1,11 +1,11 @@
 /* globals describe, beforeEach, afterEach, it */
-
 'use strict';
 
 const sinon = require('sinon');
 const expect = require('chai').expect;
 const easyFix = require('./index');
 
+const ASYNC_DELAY = 1000;
 const thingToTest = {
   state: 0,
   incStateNextTick: (stateArg, callback) => {
@@ -20,7 +20,7 @@ const thingToTest = {
     setTimeout(() => {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
-    }, 3000);
+    }, ASYNC_DELAY);
   },
   resetState: () => {
     thingToTest.state = 0;
@@ -30,7 +30,7 @@ const thingToTest = {
 let easyFixStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
-  it('falls back onto wrapped method', function (done) {
+  it('falls back onto wrapped method', (done) => {
     thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
@@ -40,7 +40,7 @@ const runSharedTests = (expectTargetFnCalls) => {
     });
   });
 
-  it('works with mulitple calls', function (done) {
+  it('works with mulitple calls', (done) => {
     thingToTest.incStateNextTick({ val: 0 }, (firstErr, firstState) => {
       thingToTest.incStateNextTick({ val: firstState }, (secondErr, secondState) => {
         expect(secondState).to.equal(2);
@@ -52,7 +52,7 @@ const runSharedTests = (expectTargetFnCalls) => {
     });
   });
 
-  it('works with circular references', function (done) {
+  it('works with circular references', (done) => {
     const testObj = { val: 0 };
     testObj.circ = testObj;
     thingToTest.incStateNextTick(testObj, (err, state) => {
@@ -65,12 +65,12 @@ const runSharedTests = (expectTargetFnCalls) => {
   });
 };
 
-describe('wrapAsyncMethod (live mode)', function () {
+describe('wrapAsyncMethod (live mode)', () => {
   beforeEach(() => {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'live',
-      sinon: sinon,
+      sinon,
       dir: 'tmp'
     });
   });
@@ -81,12 +81,12 @@ describe('wrapAsyncMethod (live mode)', function () {
   runSharedTests(true);
 });
 
-describe('wrapAsyncMethod (capture mode)', function () {
+describe('wrapAsyncMethod (capture mode)', () => {
   beforeEach(() => {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'capture',
-      sinon: sinon,
+      sinon,
       dir: 'tmp'
     });
   });
@@ -97,12 +97,12 @@ describe('wrapAsyncMethod (capture mode)', function () {
   runSharedTests(true);
 });
 
-describe('wrapAsyncMethod (replay mode)', function () {
+describe('wrapAsyncMethod (replay mode)', () => {
   beforeEach(() => {
     thingToTest.resetState();
     easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
       mode: 'replay',
-      sinon: sinon,
+      sinon,
       dir: 'tmp'
     });
   });
