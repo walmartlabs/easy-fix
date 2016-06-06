@@ -17,7 +17,7 @@
     "fixture"
   ],
   "author": "Dan Rathbone (rathbone1200cc)",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {},
   "devDependencies": {
     "babel-eslint": "6.0.4",
