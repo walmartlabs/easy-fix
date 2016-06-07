@@ -11,21 +11,28 @@ const modes = {
   replay: 'replay'
 };
 
+const HASH_LENGTH = 12;
+
+const niceErrMsg = 'This test (in replay mode) could not read the expected mock data.  If you have not already, try running this test in capture mode to generate new test fixtures.  If you continue to see this error, a likely cause is differing (frequently changing) argument for the wrapped asynchronous task.  This can be mitigated by defining an argumentSerializer option that ignores the frequently-changing argument.'; // eslint-disable-line max-len
+
 /**
  * Safe JSON Serializer will not fail in the face of circular references
  * Derived heavily from @isaacs ISC Licensed json-stringify-safe repo
  * https://github.com/isaacs/json-stringify-safe/blob/master/stringify.js
+ * @param {?function} replacer to transform serialized values
+ * @param {?function} cycleReplacer to transform cyclical values
+ * @returns {string} serialized value of the object
  */
 const stringifySafeSerializer = (replacer, cycleReplacer) => {
-  let stack = [];
-  let keys = [];
+  const stack = [];
+  const keys = [];
 
   if (!cycleReplacer) {
     cycleReplacer = (key, value) => {
       if (stack[0] === value) {
         return '[Circular ~]';
       }
-      return '[Circular ~.' + keys.slice(0, stack.indexOf(value)).join('.') + ']';
+      return `[Circular ~.${keys.slice(0, stack.indexOf(value)).join('.')}]`;
     };
   }
 
@@ -78,10 +85,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     }
 
     const argStr = options.argumentSerializer(callingArgs);
-    const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, 12);
-    const basePath = path.join(options.dir, options.prefix + '-' + hashKey);
-    const argPath = basePath + '-args.json';
-    const responsePath = options.responsePath || basePath + '-response.json';
+    const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, HASH_LENGTH);
+    const basePath = path.join(options.dir, `${options.prefix}-${hashKey}`);
+    const argPath = `${basePath}-args.json`;
+    const responsePath = options.responsePath || `${basePath}-response.json`;
     // REFACTOR: determine how to generate nicer file names.
     const origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
       const callbackArgs = Array.apply(null, arguments);
@@ -98,13 +105,18 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         argStr + os.EOL,
         'utf8');
       originalFn.apply(self, callingArgs);
-      return;
+      return null;
     }
 
     // mode is replay
-    const cannedResponse = fs.readFileSync(responsePath);
-    const cannedJson = JSON.parse(cannedResponse);
-    process.nextTick(() => {
+    fs.readFile(responsePath, (err, cannedResponse) => {
+      if (err) {
+        if (err.code === 'ENOENT') {
+          throw new Error(niceErrMsg);
+        }
+        throw err;
+      }
+      const cannedJson = JSON.parse(cannedResponse);
       origCallback.apply(self, cannedJson);
     });
   };

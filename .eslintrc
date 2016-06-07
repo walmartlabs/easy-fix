@@ -1,0 +1,15 @@
+---
+rules:
+  quotes:
+    - 2
+    - single
+  no-bitwise: 0
+  no-unused-expressions: 0
+  max-params: 0
+  max-statements: 0
+  no-invalid-this: 0
+  prefer-spread: 0
+
+extends:
+  - "defaults/configurations/walmart/es6-node"
+
