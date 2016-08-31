@@ -1,5 +1,5 @@
 {
-  "name": "@walmart/easy-fix",
+  "name": "easy-fix",
   "version": "1.0.0",
   "description": "easily capture & replay mock test data",
   "main": "index.js",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@gecgithub01.walmart.com:store-services/easy-fix.git"
+    "url": "git@github.com:walmartlabs/easy-fix.git"
   },
   "keywords": [
     "test",
