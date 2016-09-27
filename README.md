@@ -13,6 +13,7 @@ Easy-fix exposes only two methods: "wrapAsyncMethod" and "restore"
 
 Let's start with an example.  this test shows sinon stub replace with the easy-fix equivalent:
 
+```javascript
     // set up the stubs/mocks:
     before(function () {
 
@@ -43,6 +44,7 @@ Let's start with an example.  this test shows sinon stub replace with the easy-f
     after(function () {
       easyFix.restore() // remove stubs
     });
+```
 
 If you had no 'before' setup method, the test would hit the database.
 
