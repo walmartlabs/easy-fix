@@ -62,6 +62,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
+  options.isPromise = optionsArg.isPromise || false;
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
@@ -76,7 +77,62 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.responsePath = optionsArg.responsePath;
   options.sinon = optionsArg.sinon;
 
-  const wrapper = function () {
+  if (options.isPromise) {
+    let promiserWrapper = function () {
+      const callingArgs = Array.apply(null, arguments);
+      const self = this;
+
+      if (options.mode === modes.live) { // no fixtures, no problems
+        return originalFn.apply(self, callingArgs);
+      }
+
+      const argStr = options.argumentSerializer(callingArgs);
+      const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, HASH_LENGTH);
+      const basePath = path.join(options.dir, `${options.prefix}-${hashKey}`);
+      const argPath = `${basePath}-args.json`;
+      const responsePath = options.responsePath || `${basePath}-response.json`;
+
+      if (options.mode === modes.replay) {
+        const replayPromise = new Promise(function(resolve, reject) {
+          fs.readFile(responsePath, (err, cannedResponse) => {
+            if (err) {
+              reject(err);
+            } else {
+              const cannedJson = JSON.parse(cannedResponse);
+              resolve(cannedJson);
+            }
+          });
+        });
+
+        return replayPromise;
+      }
+
+      // must be capture
+      const capturePromise = new Promise(function(resolve, reject) {
+        fs.writeFileSync(argPath, argStr + os.EOL, 'utf8');
+
+        const originalPromise = originalFn.apply(self, callingArgs);
+        originalPromise.then(function(data) {
+          const serializedData = options.responseSerializer(data) + os.EOL;
+          fs.writeFileSync(responsePath, serializedData,'utf8');
+          resolve(data);
+        });
+      });
+      return capturePromise;
+    }
+
+    if (options.sinon) {
+      return options.sinon.stub(obj, method, promiserWrapper);
+    }
+
+    obj[method] = promiserWrapper;
+    promiserWrapper.restore = function () {
+      obj[method] = originalFn;
+    };
+
+    return promiserWrapper;
+  } else {
+    let wrapper = function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
@@ -129,5 +185,6 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     obj[method] = originalFn;
   };
   return wrapper;
+  }
 };
 
