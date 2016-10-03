@@ -13,36 +13,38 @@ Easy-fix exposes only two methods: "wrapAsyncMethod" and "restore"
 
 Let's start with an example.  this test shows sinon stub replace with the easy-fix equivalent:
 
-    // set up the stubs/mocks:
-    before(function () {
+```javascript
+// set up the stubs/mocks:
+before(function () {
 
-      // Perhaps you use stubs, something like this:
-      //   sinon.stub(productFees, 'getFeesForUpcs', /* stub function here */ );
+  // Perhaps you use stubs, something like this:
+  //   sinon.stub(productFees, 'getFeesForUpcs', /* stub function here */ );
 
-      // Let's replace that and use easy-fix:
-      easyFix.wrapAsyncMethod(productFees, 'getFeesForUpcs', {
-        dir: 'test/captured-data', // directory for the captured test data
-        prefix: 'product-fees', // filenames are prefixed with this string
-      });
-    };
+  // Let's replace that and use easy-fix:
+  easyFix.wrapAsyncMethod(productFees, 'getFeesForUpcs', {
+    dir: 'test/captured-data', // directory for the captured test data
+    prefix: 'product-fees', // filenames are prefixed with this string
+  });
+};
 
-    it('gets linked upcs', function (done) {
-      var upcs = [
-        '0007800015274',
-        '0069766210858'
-      ];
+it('gets linked upcs', function (done) {
+  var upcs = [
+    '0007800015274',
+    '0069766210858'
+  ];
 
-      productFees.getFeesForUpcs(upcs, function (err, fees) {
-        expect(err).to.not.exist;
-        expect(fees).to.exist;
-        expect(_.keys(fees)).to.have.length.above(2);
-        done();
-      });
-    });
+  productFees.getFeesForUpcs(upcs, function (err, fees) {
+    expect(err).to.not.exist;
+    expect(fees).to.exist;
+    expect(_.keys(fees)).to.have.length.above(2);
+    done();
+  });
+});
 
-    after(function () {
-      easyFix.restore() // remove stubs
-    });
+after(function () {
+  easyFix.restore() // remove stubs
+});
+```
 
 If you had no 'before' setup method, the test would hit the database.
 
