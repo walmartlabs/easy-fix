@@ -1,0 +1,3 @@
+{
+  "testErrorMessage": "This test (in replay mode) could not read the expected mock data from \"tmp/incStateNextTick-c156c7373216-response.json\"\n\nSerialized arguments:\n[\n  {\n    \"foo\": \"bar\"\n  },\n  null\n]\n\nIf you have not already, try running this test in capture mode to generate new test fixtures.  If you continue to see this error, a likely cause is differing (frequently changing) argument for the wrapped asynchronous task.  This can be mitigated by defining an argumentSerializer option that ignores the frequently-changing argument."
+}
