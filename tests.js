@@ -2,8 +2,10 @@
 'use strict';
 
 const sinon = require('sinon');
+const domain = require('domain');
 const expect = require('chai').expect;
 const easyFix = require('./index');
+const config = require('./test-config');
 
 const ASYNC_DELAY = 1000;
 const thingToTest = {
@@ -98,9 +100,11 @@ describe('wrapAsyncMethod (capture mode)', () => {
 });
 
 describe('wrapAsyncMethod (replay mode)', () => {
+  const STUBBED_METHOD = 'incStateNextTick';
+
   beforeEach(() => {
     thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, STUBBED_METHOD, {
       mode: 'replay',
       sinon,
       dir: 'tmp'
@@ -111,4 +115,24 @@ describe('wrapAsyncMethod (replay mode)', () => {
   });
 
   runSharedTests(false);
+
+  describe('if no matching mock data is found', () => {
+    const fnWithoutMocks = (cb) => {
+      thingToTest[STUBBED_METHOD]({
+        foo: 'bar'
+      }, () => { cb(new Error('Failed to throw')); });
+    };
+
+    it('should throw an error with details about the expected data', (done) => {
+      const d = domain.create();
+      d.on('error', (err) => {
+        expect(err.message).to.eql(config.testErrorMessage);
+
+        done();
+      });
+      d.run(() => {
+        fnWithoutMocks(done);
+      });
+    });
+  });
 });
