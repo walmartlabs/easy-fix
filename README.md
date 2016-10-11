@@ -6,6 +6,11 @@ Opinions diverge on how to do integration testing.  One camp says: "mock your in
 
 Why chose?  This module helps integration tests capture and replay test data.  This allows tests to run in "live" mode, interacting with remote systems/db, or in "replay" mode, isolated to using serialized mock data, with no side effects. This is integration testing zen.
 
+Installing
+----------
+`npm install easy-fix --save-dev`
+
+
 Usage & documentation
 ---------------------
 
@@ -55,7 +60,7 @@ Use easy-fix much like the sinon.stub - pass in an object, the name of a method,
 Test modes
 ----------
 
-Modes are specified by the TEST_MODE environment variable, and they can be overridden as the 'mode' in the options hash.  The modes are:
+Modes are specified by the `TEST_MODE` environment variable, and they can be overridden as the 'mode' in the options hash.  The modes are:
 
 *  "live": test runs live.  Easy-fix simply falls back onto the target function.
 *  "capture": test runs live, but the arguments and response are captured and written to disk.
