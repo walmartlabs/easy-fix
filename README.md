@@ -19,6 +19,9 @@ Easy-fix exposes only two methods: "wrapAsyncMethod" and "restore"
 Let's start with an example.  this test shows sinon stub replace with the easy-fix equivalent:
 
 ```javascript
+
+let wrapper;
+
 // set up the stubs/mocks:
 before(function () {
 
@@ -26,7 +29,7 @@ before(function () {
   //   sinon.stub(productFees, 'getFeesForUpcs', /* stub function here */ );
 
   // Let's replace that and use easy-fix:
-  easyFix.wrapAsyncMethod(productFees, 'getFeesForUpcs', {
+  wrapper = easyFix.wrapAsyncMethod(productFees, 'getFeesForUpcs', {
     dir: 'test/captured-data', // directory for the captured test data
     prefix: 'product-fees', // filenames are prefixed with this string
   });
@@ -47,7 +50,7 @@ it('gets linked upcs', function (done) {
 });
 
 after(function () {
-  easyFix.restore() // remove stubs
+  wrapper.restore() // remove stubs
 });
 ```
 
