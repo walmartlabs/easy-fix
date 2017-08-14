@@ -4,7 +4,7 @@ Easy-fix: record & replay test data for flexible integration testing
 
 Opinions diverge on how to do integration testing.  One camp says: "mock your input data to isolate the target code" but tests using mock data can lose fidelity with changing real-world systems.  The other camp says: "let your integration tests run live. Side effects are no problem" but those tests can run slow (for network latency, etc) and might require you to be on a private network.  Neither camp wins!
 
-Why chose?  This module helps integration tests capture and replay test data.  This allows tests to run in "live" mode, interacting with remote systems/db, or in "replay" mode, isolated to using serialized mock data, with no side effects. This is integration testing zen.
+Why choose?  This module helps integration tests capture and replay test data.  This allows tests to run in "live" mode, interacting with remote systems/db, or in "replay" mode, isolated to using serialized mock data, with no side effects. This is integration testing zen.
 
 Installing
 ----------
@@ -16,7 +16,7 @@ Usage & documentation
 
 Easy-fix exposes only two methods: "wrapAsyncMethod" and "restore"
 
-Let's start with an example.  this test shows sinon stub replace with the easy-fix equivalent:
+Let's start with an example.  This test shows sinon stub replace with the easy-fix equivalent:
 
 ```javascript
 
