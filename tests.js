@@ -6,24 +6,15 @@ const domain = require('domain');
 const expect = require('chai').expect;
 const easyFix = require('./index');
 
-const ASYNC_DELAY = 1000;
 const expectedReturnValue = 'I am a function return value';
 const thingToTest = {
   state: 0,
-  incStateNextTick: (stateArg, callback) => {
+  incStateAsync: (stateArg, callback) => {
     thingToTest.state = stateArg.val;
     process.nextTick(() => {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
     });
-    return expectedReturnValue;
-  },
-  incStateAfterThreeSeconds: (stateArg, callback) => {
-    thingToTest.state = stateArg.val;
-    setTimeout(() => {
-      thingToTest.state += 1;
-      callback(null, thingToTest.state);
-    }, ASYNC_DELAY);
     return expectedReturnValue;
   },
   resetState: () => {
@@ -35,10 +26,10 @@ let easyFixStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
-    const foundReturnValue = thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
+    const foundReturnValue = thingToTest.incStateAsync({ val: 9 }, (err, state) => {
       expect(foundReturnValue).to.equal(expectedReturnValue);
-      expect(state).to.equal(1);
-      const expectedTargetState = expectTargetFnCalls ? 1 : 0;
+      expect(state).to.equal(10);
+      const expectedTargetState = expectTargetFnCalls ? 10 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
       expect(easyFixStub.callCount).to.equal(1);
       done();
@@ -46,14 +37,16 @@ const runSharedTests = (expectTargetFnCalls) => {
   });
 
   it('works with mulitple calls', (done) => {
-    const firstReturned = thingToTest.incStateNextTick({ val: 0 }, (firstErr, firstState) => {
-      const secondReturned = thingToTest.incStateNextTick({
-        val: firstState
-      }, (secondErr, secondState) => {
+    const firstReturned = thingToTest.incStateAsync({
+      val: 98
+    }, (firstErr, stateAfterFirstInc) => {
+      const secondReturned = thingToTest.incStateAsync({
+        val: stateAfterFirstInc
+      }, (secondErr, stateAfterSecondInc) => {
         expect(firstReturned).to.equal(expectedReturnValue);
         expect(secondReturned).to.equal(expectedReturnValue);
-        expect(secondState).to.equal(2);
-        const expectedTargetState = expectTargetFnCalls ? 2 : 0;
+        expect(stateAfterSecondInc).to.equal(100);
+        const expectedTargetState = expectTargetFnCalls ? 100 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
         expect(easyFixStub.callCount).to.equal(2);
         done();
@@ -63,8 +56,8 @@ const runSharedTests = (expectTargetFnCalls) => {
 
   it('works with circular references', (done) => {
     const testObj = { val: 0 };
-    testObj.circ = testObj;
-    thingToTest.incStateNextTick(testObj, (err, state) => {
+    testObj.circ = testObj; // add circular reference
+    thingToTest.incStateAsync(testObj, (err, state) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
@@ -72,12 +65,18 @@ const runSharedTests = (expectTargetFnCalls) => {
       done();
     });
   });
+
 };
+
+// The call to incStateAsync includes a parameter (val)
+// that sets the state, but that won't happen when the
+// method is wrapped and called in reply mode.
+// So we reset the state with resetState before each test.
+beforeEach(() => { thingToTest.resetState(); });
 
 describe('wrapAsyncMethod (live mode)', () => {
   beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
       mode: 'live',
       sinon,
       dir: 'tmp'
@@ -92,8 +91,7 @@ describe('wrapAsyncMethod (live mode)', () => {
 
 describe('wrapAsyncMethod (capture mode)', () => {
   beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
       mode: 'capture',
       sinon,
       dir: 'tmp'
@@ -107,11 +105,8 @@ describe('wrapAsyncMethod (capture mode)', () => {
 });
 
 describe('wrapAsyncMethod (replay mode)', () => {
-  const STUBBED_METHOD = 'incStateNextTick';
-
   beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, STUBBED_METHOD, {
+    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
       mode: 'replay',
       sinon,
       dir: 'tmp'
@@ -125,7 +120,7 @@ describe('wrapAsyncMethod (replay mode)', () => {
 
   describe('if no matching mock data is found', () => {
     const fnWithoutMocks = (cb) => {
-      thingToTest[STUBBED_METHOD]({
+      thingToTest.incStateAsync({
         foo: 'bar'
       }, () => { cb(new Error('Failed to throw')); });
     };
