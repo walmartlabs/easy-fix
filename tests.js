@@ -17,12 +17,22 @@ const thingToTest = {
     });
     return expectedReturnValue;
   },
+  incStatePromise: (stateArg) => {
+    return new Promise((resolve) => {
+      thingToTest.state = stateArg.val;
+      process.nextTick(() => {
+        thingToTest.state += 1;
+        resolve(thingToTest.state);
+      });
+    });
+  },
   resetState: () => {
     thingToTest.state = 0;
   }
 };
 
-let easyFixStub;
+let asyncStub;
+let promiseStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
@@ -31,7 +41,7 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(10);
       const expectedTargetState = expectTargetFnCalls ? 10 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(easyFixStub.callCount).to.equal(1);
+      expect(asyncStub.callCount).to.equal(1);
       done();
     });
   });
@@ -48,7 +58,7 @@ const runSharedTests = (expectTargetFnCalls) => {
         expect(stateAfterSecondInc).to.equal(100);
         const expectedTargetState = expectTargetFnCalls ? 100 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
-        expect(easyFixStub.callCount).to.equal(2);
+        expect(asyncStub.callCount).to.equal(2);
         done();
       });
     });
@@ -61,9 +71,22 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(easyFixStub.callCount).to.equal(1);
+      expect(asyncStub.callCount).to.equal(1);
       done();
     });
+  });
+
+  it('works with promises', (done) => {
+    const testObj = { val: 49 };
+    thingToTest.incStatePromise(testObj)
+    .then((state) => {
+      expect(state).to.equal(50);
+      const expectedTargetState = expectTargetFnCalls ? 50 : 0;
+      expect(thingToTest.state).to.equal(expectedTargetState);
+      expect(asyncStub.callCount).to.equal(1);
+      done();
+    })
+    .catch(done);
   });
 
 };
@@ -74,48 +97,35 @@ const runSharedTests = (expectTargetFnCalls) => {
 // So we reset the state with resetState before each test.
 beforeEach(() => { thingToTest.resetState(); });
 
-describe('wrapAsyncMethod (live mode)', () => {
+const setupMocks = (mode) => {
   beforeEach(() => {
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
-      mode: 'live',
+    const options = {
+      mode,
       sinon,
       dir: 'tmp'
-    });
+    };
+    asyncStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', options);
+    promiseStub = easyFix.wrapAsyncMethod(thingToTest, 'incStatePromise', options);
   });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
+};
 
+afterEach(() => {
+  asyncStub.restore();
+  promiseStub.restore();
+});
+
+describe('wrapAsyncMethod (live mode)', () => {
+  setupMocks('live');
   runSharedTests(true);
 });
 
 describe('wrapAsyncMethod (capture mode)', () => {
-  beforeEach(() => {
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
-      mode: 'capture',
-      sinon,
-      dir: 'tmp'
-    });
-  });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
-
+  setupMocks('capture');
   runSharedTests(true);
 });
 
 describe('wrapAsyncMethod (replay mode)', () => {
-  beforeEach(() => {
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', {
-      mode: 'replay',
-      sinon,
-      dir: 'tmp'
-    });
-  });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
-
+  setupMocks('replay');
   runSharedTests(false);
 
   describe('if no matching mock data is found', () => {
