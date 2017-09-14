@@ -2,7 +2,6 @@
 'use strict';
 
 const sinon = require('sinon');
-const domain = require('domain');
 const expect = require('chai').expect;
 const easyFix = require('./index');
 
@@ -64,7 +63,7 @@ const runSharedTests = (expectTargetFnCalls) => {
     });
   });
 
-  it('works with circular references', (done) => {
+  it('handles circular references gracefully', (done) => {
     const testObj = { val: 0 };
     testObj.circ = testObj; // add circular reference
     thingToTest.incStateAsync(testObj, (err, state) => {
@@ -83,7 +82,7 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(state).to.equal(50);
       const expectedTargetState = expectTargetFnCalls ? 50 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(asyncStub.callCount).to.equal(1);
+      expect(promiseStub.callCount).to.equal(1);
       done();
     })
     .catch(done);
