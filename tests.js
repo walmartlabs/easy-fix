@@ -5,9 +5,9 @@ const sinon = require('sinon');
 const domain = require('domain');
 const expect = require('chai').expect;
 const easyFix = require('./index');
-const config = require('./test-config');
 
 const ASYNC_DELAY = 1000;
+const expectedReturnValue = 'I am a function return value';
 const thingToTest = {
   state: 0,
   incStateNextTick: (stateArg, callback) => {
@@ -16,6 +16,7 @@ const thingToTest = {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
     });
+    return expectedReturnValue;
   },
   incStateAfterThreeSeconds: (stateArg, callback) => {
     thingToTest.state = stateArg.val;
@@ -23,6 +24,7 @@ const thingToTest = {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
     }, ASYNC_DELAY);
+    return expectedReturnValue;
   },
   resetState: () => {
     thingToTest.state = 0;
@@ -33,7 +35,8 @@ let easyFixStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
-    thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
+    const foundReturnValue = thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
+      expect(foundReturnValue).to.equal(expectedReturnValue);
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
@@ -43,8 +46,12 @@ const runSharedTests = (expectTargetFnCalls) => {
   });
 
   it('works with mulitple calls', (done) => {
-    thingToTest.incStateNextTick({ val: 0 }, (firstErr, firstState) => {
-      thingToTest.incStateNextTick({ val: firstState }, (secondErr, secondState) => {
+    const firstReturned = thingToTest.incStateNextTick({ val: 0 }, (firstErr, firstState) => {
+      const secondReturned = thingToTest.incStateNextTick({
+        val: firstState
+      }, (secondErr, secondState) => {
+        expect(firstReturned).to.equal(expectedReturnValue);
+        expect(secondReturned).to.equal(expectedReturnValue);
         expect(secondState).to.equal(2);
         const expectedTargetState = expectTargetFnCalls ? 2 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
@@ -124,15 +131,8 @@ describe('wrapAsyncMethod (replay mode)', () => {
     };
 
     it('should throw an error with details about the expected data', (done) => {
-      const d = domain.create();
-      d.on('error', (err) => {
-        expect(err.message).to.eql(config.testErrorMessage);
-
-        done();
-      });
-      d.run(() => {
-        fnWithoutMocks(done);
-      });
+      expect(() => fnWithoutMocks(done)).to.throw();
+      done();
     });
   });
 });

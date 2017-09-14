@@ -65,6 +65,7 @@ const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
   const options = {};
+  // allow the options argument to simply be the directory option
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
@@ -73,58 +74,57 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     args[args.length - 1] = newCallback;
     return origCallback;
   };
-  options.argumentSerializer = optionsArg.argumentSerializer || function (args) {
-    return stringifySafe(args, null, '  ');
-  };
-  options.responseSerializer = optionsArg.responseSerializer || function (args) {
-    return stringifySafe(args, null, '  ');
-  };
-  options.responsePath = optionsArg.responsePath;
+  options.argumentSerializer = optionsArg.argumentSerializer || stringifySafe;
+  options.responseSerializer = optionsArg.responseSerializer || stringifySafe;
+  options.returnValueSerializer = optionsArg.returnValueSerializer || stringifySafe;
   options.sinon = optionsArg.sinon;
 
   const wrapper = function () {
     const callingArgs = Array.apply(null, arguments);
     const self = this;
 
-    if (options.mode === modes.live) { // no fixtures, no problems
+    if (options.mode === modes.live) { // no fixtures, no problems. We're done here.
       return originalFn.apply(self, callingArgs);
     }
 
     const argStr = options.argumentSerializer(callingArgs);
     const hashKey = crypto.createHash('sha256').update(argStr).digest('hex').slice(0, HASH_LENGTH);
-    const basePath = path.join(options.dir, `${options.prefix}-${hashKey}`);
-    const argPath = `${basePath}-args.json`;
-    const responsePath = options.responsePath || `${basePath}-response.json`;
-    // REFACTOR: determine how to generate nicer file names.
+    const filepath = path.join(options.dir, `${options.prefix}-${hashKey}.json`);
+    let returnValue;
     const origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
       const callbackArgs = Array.apply(null, arguments);
+      const wrappedCallData = {
+        callArgs: argStr,
+        callbackArgs: options.responseSerializer(callbackArgs),
+        returnValue: options.returnValueSerializer(returnValue)
+      };
       fs.writeFileSync(
-        responsePath,
-        options.responseSerializer(callbackArgs) + os.EOL,
+        filepath,
+        stringifySafe(wrappedCallData) + os.EOL,
         'utf8');
       origCallback.apply(this, callbackArgs);
     }]);
 
     if (options.mode === modes.capture) {
-      fs.writeFileSync(
-        argPath,
-        argStr + os.EOL,
-        'utf8');
-      originalFn.apply(self, callingArgs);
-      return null;
+      returnValue = originalFn.apply(self, callingArgs);
+      return returnValue;
     }
 
     // mode is replay
-    fs.readFile(responsePath, (err, cannedResponse) => {
-      if (err) {
-        if (err.code === 'ENOENT') {
-          throw new Error(getNiceError(responsePath, argStr));
-        }
-        throw err;
+    let cannedData;
+    try {
+      cannedData = fs.readFileSync(filepath, 'utf8');
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        throw new Error(getNiceError(filepath, argStr));
       }
-      const cannedJson = JSON.parse(cannedResponse);
-      origCallback.apply(self, cannedJson);
+      throw err;
+    }
+    const cannedJson = JSON.parse(cannedData);
+    process.nextTick(() => {
+      origCallback.apply(self, JSON.parse(cannedJson.callbackArgs));
     });
+    return JSON.parse(cannedJson.returnValue);
   };
 
   if (options.sinon) {
