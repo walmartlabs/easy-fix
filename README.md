@@ -6,6 +6,10 @@ Opinions diverge on how to do integration testing.  One camp says: "mock your in
 
 Why choose?  This module helps integration tests capture and replay test data.  This allows tests to run in "live" mode, interacting with remote systems/db, or in "replay" mode, isolated to using serialized mock data, with no side effects. This is integration testing zen.
 
+NEW in v2
+---------
+Easy-fix v2 now supports promises!  See the [changelog](CHANGELOG.md) for details.
+
 Installing
 ----------
 `npm install easy-fix --save-dev`
@@ -75,6 +79,8 @@ Options
 *  "dir": test data is written into this directory. This defaults to "test/data".
 *  "prefix": test data filenames are prefixed with this string. This defaults to the name of the target function.
 *  "mode": override the TEST_MODE environment variable.  In the absence of the TEST_MODE and this option, the mode defaults to "replay".
-*  "callbackSwap": allow an alternate function to monkey-patch the target function callbacks.  If the target function under test does not follow node convention of having a callback as it's last agument, you'll need to provide a custom function for this option.
-*  "argumentSerializer":  allow an alternate serialization to JSON.stringify on the target function arguments.  This is useful for deduplicating test data where you expect the arguments will be different for each call (perhaps with a timestamp or uuid) but do not require a unique response.
+*  "callbackSwap": allow an alternate function to monkey-patch the target function callback.  If the target function (under test) does not follow the nodejs convention of having a callback as it's last agument, you'll need to use this option to provide a custom function to swap the callbacks.
+*  "argumentSerializer":  allow an alternate serialization to JSON.stringify on the target function arguments.  Easy-fix will match responses to a hash of the serialized call arguments. This is useful for deduplicating test data where you expect the call arguments will be different for each call but do not require a unique response (perhaps for a timestamp or uuid).
+*  "responseSerializer":  allow an alternate serialization to JSON.stringify on the target function callback arguments.  This may be useful, for example, in removing details from a long response, if the test requires only some of the unaffected details.  Note that this argument applies to the callback arguments for Promise resolution/rejection as well as an asynchronous function callback.
+*  "returnValueSerializer":  allow an alternate serialization to JSON.stringify on the target function return value.  This may be useful, for example, in removing details from a long return value, if the test requires only some of the unaffected details.
 
