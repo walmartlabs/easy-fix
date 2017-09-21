@@ -2,137 +2,141 @@
 'use strict';
 
 const sinon = require('sinon');
-const domain = require('domain');
 const expect = require('chai').expect;
 const easyFix = require('./index');
-const config = require('./test-config');
 
-const ASYNC_DELAY = 1000;
+const expectedReturnValue = 'I am a function return value';
 const thingToTest = {
   state: 0,
-  incStateNextTick: (stateArg, callback) => {
+  incStateAsync: (stateArg, callback) => {
     thingToTest.state = stateArg.val;
     process.nextTick(() => {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
     });
+    return expectedReturnValue;
   },
-  incStateAfterThreeSeconds: (stateArg, callback) => {
-    thingToTest.state = stateArg.val;
-    setTimeout(() => {
-      thingToTest.state += 1;
-      callback(null, thingToTest.state);
-    }, ASYNC_DELAY);
+  incStatePromise: (stateArg) => {
+    return new Promise((resolve) => {
+      thingToTest.state = stateArg.val;
+      process.nextTick(() => {
+        thingToTest.state += 1;
+        resolve(thingToTest.state);
+      });
+    });
   },
   resetState: () => {
     thingToTest.state = 0;
   }
 };
 
-let easyFixStub;
+let asyncStub;
+let promiseStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
-    thingToTest.incStateNextTick({ val: 0 }, (err, state) => {
-      expect(state).to.equal(1);
-      const expectedTargetState = expectTargetFnCalls ? 1 : 0;
+    const foundReturnValue = thingToTest.incStateAsync({ val: 9 }, (err, state) => {
+      expect(foundReturnValue).to.equal(expectedReturnValue);
+      expect(state).to.equal(10);
+      const expectedTargetState = expectTargetFnCalls ? 10 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(easyFixStub.callCount).to.equal(1);
+      expect(asyncStub.callCount).to.equal(1);
       done();
     });
   });
 
   it('works with mulitple calls', (done) => {
-    thingToTest.incStateNextTick({ val: 0 }, (firstErr, firstState) => {
-      thingToTest.incStateNextTick({ val: firstState }, (secondErr, secondState) => {
-        expect(secondState).to.equal(2);
-        const expectedTargetState = expectTargetFnCalls ? 2 : 0;
+    const firstReturned = thingToTest.incStateAsync({
+      val: 98
+    }, (firstErr, stateAfterFirstInc) => {
+      const secondReturned = thingToTest.incStateAsync({
+        val: stateAfterFirstInc
+      }, (secondErr, stateAfterSecondInc) => {
+        expect(firstReturned).to.equal(expectedReturnValue);
+        expect(secondReturned).to.equal(expectedReturnValue);
+        expect(stateAfterSecondInc).to.equal(100);
+        const expectedTargetState = expectTargetFnCalls ? 100 : 0;
         expect(thingToTest.state).to.equal(expectedTargetState);
-        expect(easyFixStub.callCount).to.equal(2);
+        expect(asyncStub.callCount).to.equal(2);
         done();
       });
     });
   });
 
-  it('works with circular references', (done) => {
+  it('handles circular references gracefully', (done) => {
     const testObj = { val: 0 };
-    testObj.circ = testObj;
-    thingToTest.incStateNextTick(testObj, (err, state) => {
+    testObj.circ = testObj; // add circular reference
+    thingToTest.incStateAsync(testObj, (err, state) => {
       expect(state).to.equal(1);
       const expectedTargetState = expectTargetFnCalls ? 1 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
-      expect(easyFixStub.callCount).to.equal(1);
+      expect(asyncStub.callCount).to.equal(1);
       done();
     });
   });
+
+  it('works with promises', (done) => {
+    const testObj = { val: 49 };
+    thingToTest.incStatePromise(testObj)
+    .then((state) => {
+      expect(state).to.equal(50);
+      const expectedTargetState = expectTargetFnCalls ? 50 : 0;
+      expect(thingToTest.state).to.equal(expectedTargetState);
+      expect(promiseStub.callCount).to.equal(1);
+      done();
+    })
+    .catch(done);
+  });
+
 };
 
-describe('wrapAsyncMethod (live mode)', () => {
+// The call to incStateAsync includes a parameter (val)
+// that sets the state, but that won't happen when the
+// method is wrapped and called in reply mode.
+// So we reset the state with resetState before each test.
+beforeEach(() => { thingToTest.resetState(); });
+
+const setupMocks = (mode) => {
   beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
-      mode: 'live',
+    const options = {
+      mode,
       sinon,
       dir: 'tmp'
-    });
+    };
+    asyncStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', options);
+    promiseStub = easyFix.wrapAsyncMethod(thingToTest, 'incStatePromise', options);
   });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
+};
 
+afterEach(() => {
+  asyncStub.restore();
+  promiseStub.restore();
+});
+
+describe('wrapAsyncMethod (live mode)', () => {
+  setupMocks('live');
   runSharedTests(true);
 });
 
 describe('wrapAsyncMethod (capture mode)', () => {
-  beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateNextTick', {
-      mode: 'capture',
-      sinon,
-      dir: 'tmp'
-    });
-  });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
-
+  setupMocks('capture');
   runSharedTests(true);
 });
 
 describe('wrapAsyncMethod (replay mode)', () => {
-  const STUBBED_METHOD = 'incStateNextTick';
-
-  beforeEach(() => {
-    thingToTest.resetState();
-    easyFixStub = easyFix.wrapAsyncMethod(thingToTest, STUBBED_METHOD, {
-      mode: 'replay',
-      sinon,
-      dir: 'tmp'
-    });
-  });
-  afterEach(() => {
-    easyFixStub.restore();
-  });
-
+  setupMocks('replay');
   runSharedTests(false);
 
   describe('if no matching mock data is found', () => {
     const fnWithoutMocks = (cb) => {
-      thingToTest[STUBBED_METHOD]({
+      thingToTest.incStateAsync({
         foo: 'bar'
       }, () => { cb(new Error('Failed to throw')); });
     };
 
     it('should throw an error with details about the expected data', (done) => {
-      const d = domain.create();
-      d.on('error', (err) => {
-        expect(err.message).to.eql(config.testErrorMessage);
-
-        done();
-      });
-      d.run(() => {
-        fnWithoutMocks(done);
-      });
+      expect(() => fnWithoutMocks(done)).to.throw();
+      done();
     });
   });
 });
