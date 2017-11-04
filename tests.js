@@ -96,13 +96,34 @@ const runSharedTests = (expectTargetFnCalls) => {
 // So we reset the state with resetState before each test.
 beforeEach(() => { thingToTest.resetState(); });
 
-const setupMocks = (mode) => {
+const reverseSerializer = (args) => {
+  const str = easyFix.stringifySafe(args, null, '');
+  return Array.from(str).reverse().join('');
+};
+
+const reverseDeserializer = (str) => {
+  const unreversed = Array.from(str).reverse().join('');
+  const args = JSON.parse(unreversed, null, '');
+  return args;
+};
+
+const setupMocks = (mode, useSerializers) => {
   beforeEach(() => {
     const options = {
       mode,
       sinon,
-      dir: 'tmp'
+      dir: 'tmp',
+      prefix: 'default-serializer'
     };
+    if (useSerializers) {
+      options.prefix = 'reverse-serializer';
+      options.argumentSerializer = reverseSerializer;
+      options.responseSerializer = reverseSerializer;
+      options.returnValueSerializer = reverseSerializer;
+      options.argumentDeserializer = reverseDeserializer;
+      options.responseDeserializer = reverseDeserializer;
+      options.returnValueDeserializer = reverseDeserializer;
+    }
     asyncStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', options);
     promiseStub = easyFix.wrapAsyncMethod(thingToTest, 'incStatePromise', options);
   });
@@ -123,6 +144,11 @@ describe('wrapAsyncMethod (capture mode)', () => {
   runSharedTests(true);
 });
 
+describe('wrapAsyncMethod (capture mode) with custom serializers', () => {
+  setupMocks('capture', true);
+  runSharedTests(true);
+});
+
 describe('wrapAsyncMethod (replay mode)', () => {
   setupMocks('replay');
   runSharedTests(false);
@@ -139,4 +165,9 @@ describe('wrapAsyncMethod (replay mode)', () => {
       done();
     });
   });
+});
+
+describe('wrapAsyncMethod (replay mode) with custom deserializers', () => {
+  setupMocks('replay', true);
+  runSharedTests(false);
 });

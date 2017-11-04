@@ -59,9 +59,11 @@ const stringifySafeSerializer = (replacer, cycleReplacer) => {
   };
 };
 
-const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
+exports.stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
+
+// const noop = arg => arg;
 
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
@@ -75,9 +77,12 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     args[args.length - 1] = newCallback;
     return origCallback;
   };
-  options.argumentSerializer = optionsArg.argumentSerializer || stringifySafe;
-  options.responseSerializer = optionsArg.responseSerializer || stringifySafe;
-  options.returnValueSerializer = optionsArg.returnValueSerializer || stringifySafe;
+  options.argumentSerializer = optionsArg.argumentSerializer || exports.stringifySafe;
+  options.responseSerializer = optionsArg.responseSerializer || exports.stringifySafe;
+  options.returnValueSerializer = optionsArg.returnValueSerializer || exports.stringifySafe;
+  const argumentDeserializer = optionsArg.argumentDeserializer || JSON.parse;
+  const responseDeserializer = optionsArg.responseDeserializer || JSON.parse;
+  const returnValueDeserializer = optionsArg.returnValueDeserializer || JSON.parse;
   options.sinon = optionsArg.sinon;
 
   const wrapper = function () {
@@ -103,7 +108,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     const writeWrappedCallData = () => {
       fs.writeFileSync(
         filepath,
-        stringifySafe(wrappedCallData, null, '  ') + os.EOL,
+        exports.stringifySafe(wrappedCallData, null, '  ') + os.EOL,
         'utf8');
     };
 
@@ -160,23 +165,23 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     const cannedJson = JSON.parse(cannedData);
     if (cannedJson.callbackArgs) {
       process.nextTick(() => {
-        origCallback.apply(self, JSON.parse(cannedJson.callbackArgs));
+        origCallback.apply(self, responseDeserializer(cannedJson.callbackArgs));
       });
     }
     if (cannedJson.returnedPromise) {
       return new Promise((resolve, reject) => {
         process.nextTick(() => {
           if (cannedJson.promiseResolutionArgs) {
-            return resolve.apply(self, JSON.parse(cannedJson.promiseResolutionArgs));
+            return resolve.apply(self, responseDeserializer(cannedJson.promiseResolutionArgs));
           }
           if (cannedJson.promiseRejectionArgs) {
-            return reject.apply(self, JSON.parse(cannedJson.promiseRejectionArgs));
+            return reject.apply(self, responseDeserializer(cannedJson.promiseRejectionArgs));
           }
           return reject(new Error(NICE_ERR_PROMISE));
         });
       });
     }
-    return JSON.parse(cannedJson.returnValue);
+    return returnValueDeserializer(cannedJson.returnValue);
   };
 
   if (options.sinon) {
