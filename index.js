@@ -73,6 +73,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
   options.log = optionsArg.log;
+  options.reinstantiateErrors = true;
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
@@ -128,12 +129,16 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
         const callbackArgs = Array.from(arguments);
         wrappedCallData.callbackArgs = options.responseSerializer(callbackArgs);
+        if (callbackArgs[0] instanceof Error) {
+          wrappedCallData.calledBackWithError = true;
+        }
         writeWrappedCallData();
         origCallback.apply(this, callbackArgs);
       }]);
     }
 
     if (options.mode === modes.capture) {
+      // mode is capture
       let returnValue = originalFn.apply(self, callingArgs);
       wrappedCallData.returnedPromise = !!returnValue.then;
       if (wrappedCallData.returnedPromise) {
@@ -150,6 +155,9 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
           })
           .catch(function () {
             const promiseRejectionArgs = Array.from(arguments);
+            if (promiseRejectionArgs[0] instanceof Error) {
+              wrappedCallData.rejectedWithError = true;
+            }
             return new Promise((resolve, reject) => {
               wrappedCallData.promiseRejectionArgs =
                 options.responseSerializer(promiseRejectionArgs);
@@ -182,7 +190,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     const cannedJson = JSON.parse(cannedData);
     if (cannedJson.callbackArgs) {
       process.nextTick(() => {
-        origCallback.apply(self, responseDeserializer(cannedJson.callbackArgs));
+        const callbackArgs = responseDeserializer(cannedJson.callbackArgs);
+        if (cannedJson.calledBackWithError) {
+          callbackArgs[0] = new Error('error reinstantiated by easy-fix');
+        }
+        origCallback.apply(self, callbackArgs);
       });
     }
     if (cannedJson.returnedPromise) {
@@ -192,7 +204,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
             return resolve.apply(self, responseDeserializer(cannedJson.promiseResolutionArgs));
           }
           if (cannedJson.promiseRejectionArgs) {
-            return reject.apply(self, responseDeserializer(cannedJson.promiseRejectionArgs));
+            const promiseRejectionArgs = responseDeserializer(cannedJson.promiseRejectionArgs);
+            if (cannedJson.rejectedWithError) {
+              promiseRejectionArgs[0] = new Error('error reinstantiated by easy-fix');
+            }
+            return reject.apply(self, promiseRejectionArgs);
           }
           return reject(new Error(NICE_ERR_PROMISE));
         });
