@@ -72,6 +72,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
+  options.log = optionsArg.log;
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
@@ -117,6 +118,9 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         filepath,
         exports.stringifySafe(wrappedCallData, null, '  ') + os.EOL,
         'utf8');
+      if (options.log) {
+        fs.appendFileSync(options.log, `wrote new mock ${filepath}\n`, 'utf8');
+      }
     };
 
     let origCallback;
@@ -165,9 +169,15 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       cannedData = fs.readFileSync(filepath, 'utf8');
     } catch (err) {
       if (err.code === 'ENOENT') {
+        if (options.log) {
+          fs.appendFileSync(options.log, `could not find ${filepath}\n`, 'utf8');
+        }
         throw new Error(getNiceError(filepath, argStr));
       }
       throw err;
+    }
+    if (options.log) {
+      fs.appendFileSync(options.log, `read mock ${filepath}\n`, 'utf8');
     }
     const cannedJson = JSON.parse(cannedData);
     if (cannedJson.callbackArgs) {
