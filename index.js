@@ -63,7 +63,7 @@ exports.stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
 
-// const noop = arg => arg;
+const noop = arg => arg;
 
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
@@ -77,12 +77,19 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     args[args.length - 1] = newCallback;
     return origCallback;
   };
-  options.argumentSerializer = optionsArg.argumentSerializer || exports.stringifySafe;
-  options.responseSerializer = optionsArg.responseSerializer || exports.stringifySafe;
-  options.returnValueSerializer = optionsArg.returnValueSerializer || exports.stringifySafe;
-  const argumentDeserializer = optionsArg.argumentDeserializer || JSON.parse;
-  const responseDeserializer = optionsArg.responseDeserializer || JSON.parse;
-  const returnValueDeserializer = optionsArg.returnValueDeserializer || JSON.parse;
+  options.argumentSerializer = optionsArg.argumentSerializer || noop;
+  options.responseSerializer = optionsArg.responseSerializer || noop;
+  options.returnValueSerializer = optionsArg.returnValueSerializer || noop;
+
+  const argumentDeserializer = optionsArg.argumentDeserializer ||
+    (optionsArg.argumentSerializer ? JSON.parse : noop);
+
+  const responseDeserializer = optionsArg.responseDeserializer ||
+    (optionsArg.responseSerializer ? JSON.parse : noop);
+
+  const returnValueDeserializer = optionsArg.returnValueDeserializer ||
+    (optionsArg.returnValueSerializer ? JSON.parse : noop);
+
   options.sinon = optionsArg.sinon;
 
   const wrapper = function () {
@@ -94,7 +101,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       return originalFn.apply(self, callingArgs);
     }
 
-    const argStr = options.argumentSerializer(callingArgs);
+    const wrappedCallData = {
+      callArgs: options.argumentSerializer(callingArgs)
+    };
+    const argStr = exports.stringifySafe(wrappedCallData.callArgs);
     const hashKey =
       crypto
       .createHash('sha256')
@@ -102,9 +112,6 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       .digest('hex')
       .slice(0, HASH_LENGTH);
     const filepath = path.join(options.dir, `${options.prefix}-${hashKey}.json`);
-    const wrappedCallData = {
-      callArgs: argStr
-    };
     const writeWrappedCallData = () => {
       fs.writeFileSync(
         filepath,
