@@ -140,7 +140,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     if (options.mode === modes.capture) {
       // mode is capture
       let returnValue = originalFn.apply(self, callingArgs);
-      wrappedCallData.returnedPromise = !!returnValue.then;
+      wrappedCallData.returnedPromise = returnValue && !!returnValue.then;
       if (wrappedCallData.returnedPromise) {
         returnValue =
           returnValue
