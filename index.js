@@ -11,6 +11,8 @@ const modes = {
   replay: 'replay'
 };
 
+const mockFileCache = {};
+
 const HASH_LENGTH = 12;
 
 const NICE_ERR_HEADER = 'This test (in replay mode) could not read the expected mock data from'; // eslint-disable-line max-len
@@ -73,7 +75,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
   options.log = optionsArg.log;
-  options.reinstantiateErrors = true;
+  if (optionsArg.reinstantiateErrors !== undefined) {
+    options.reinstantiateErrors = optionsArg.reinstantiateErrors;
+  } else {
+    options.reinstantiateErrors = true;
+  }
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
@@ -130,7 +136,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         const callbackArgs = Array.from(arguments);
         wrappedCallData.callbackArgs = options.responseSerializer(callbackArgs);
         if (callbackArgs[0] instanceof Error) {
-          wrappedCallData.calledBackWithError = true;
+          wrappedCallData.calledBackWithError = {
+            message: callbackArgs[0].message,
+            stack: callbackArgs[0].stack
+          };
         }
         writeWrappedCallData();
         origCallback.apply(this, callbackArgs);
@@ -156,7 +165,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
           .catch(function () {
             const promiseRejectionArgs = Array.from(arguments);
             if (promiseRejectionArgs[0] instanceof Error) {
-              wrappedCallData.rejectedWithError = true;
+              wrappedCallData.rejectedWithError = {
+                message: callbackArgs[0].message,
+                stack: callbackArgs[0].stack
+              };
             }
             return new Promise((resolve, reject) => {
               wrappedCallData.promiseRejectionArgs =
@@ -174,7 +186,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     // mode is replay
     let cannedData;
     try {
-      cannedData = fs.readFileSync(filepath, 'utf8');
+      if (!mockFileCache[filepath]) {
+        mockFileCache[filepath] = fs.readFileSync(filepath, 'utf8');
+      }
+      cannedData = mockFileCache[filepath];
     } catch (err) {
       if (err.code === 'ENOENT') {
         if (options.log) {
@@ -191,8 +206,9 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     if (cannedJson.callbackArgs) {
       process.nextTick(() => {
         const callbackArgs = responseDeserializer(cannedJson.callbackArgs);
-        if (cannedJson.calledBackWithError) {
-          callbackArgs[0] = new Error('error reinstantiated by easy-fix');
+        if (options.reinstantiateErrors && cannedJson.calledBackWithError && callbackArgs[0] instanceof Error === false) {
+          callbackArgs[0] = new Error(`${cannedJson.calledBackWithError.message} (error reinstantiated by easy-fix)`);
+          callbackArgs[0].stack = cannedJson.calledBackWithError.stack;
         }
         origCallback.apply(self, callbackArgs);
       });
@@ -205,8 +221,9 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
           }
           if (cannedJson.promiseRejectionArgs) {
             const promiseRejectionArgs = responseDeserializer(cannedJson.promiseRejectionArgs);
-            if (cannedJson.rejectedWithError) {
-              promiseRejectionArgs[0] = new Error('error reinstantiated by easy-fix');
+            if (options.reinstantiateErrors && cannedJson.rejectedWithError && promiseRejectionArgs[0] instanceof Error === false) {
+              promiseRejectionArgs[0] = new Error(`${cannedJson.rejectedWithError.message} (error reinstantiated by easy-fix)`);
+              promiseRejectionArgs[0].stack = cannedJson.rejectedWithError.stack;
             }
             return reject.apply(self, promiseRejectionArgs);
           }
