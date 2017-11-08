@@ -6,6 +6,7 @@ const expect = require('chai').expect;
 const easyFix = require('./index');
 
 const expectedReturnValue = 'I am a function return value';
+const errorMessage = 'This is a predictable error';
 const thingToTest = {
   state: 0,
   incStateAsync: (stateArg, callback) => {
@@ -13,6 +14,13 @@ const thingToTest = {
     process.nextTick(() => {
       thingToTest.state += 1;
       callback(null, thingToTest.state);
+    });
+    return expectedReturnValue;
+  },
+  causeAsyncError: (callback) => {
+    process.nextTick(() => {
+      const error = new Error(errorMessage);
+      callback(error);
     });
     return expectedReturnValue;
   },
@@ -25,6 +33,13 @@ const thingToTest = {
       });
     });
   },
+  promiseThatRejects: () => {
+    return new Promise((resolve, reject) => {
+      process.nextTick(() => {
+        reject(new Error(errorMessage));
+      });
+    });
+  },
   resetState: () => {
     thingToTest.state = 0;
   }
@@ -32,6 +47,8 @@ const thingToTest = {
 
 let asyncStub;
 let promiseStub;
+let causeErrorStub;
+let promiseRejectStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
@@ -41,6 +58,15 @@ const runSharedTests = (expectTargetFnCalls) => {
       const expectedTargetState = expectTargetFnCalls ? 10 : 0;
       expect(thingToTest.state).to.equal(expectedTargetState);
       expect(asyncStub.callCount).to.equal(1);
+      done();
+    });
+  });
+
+  it('handles errors gracefully', (done) => {
+    const foundReturnValue = thingToTest.causeAsyncError((err) => {
+      expect(foundReturnValue).to.equal(expectedReturnValue);
+      expect(err instanceof Error).to.equal(true);
+      expect(causeErrorStub.callCount).to.equal(1);
       done();
     });
   });
@@ -88,6 +114,20 @@ const runSharedTests = (expectTargetFnCalls) => {
     .catch(done);
   });
 
+  it('handles promise rejection gracefully', (done) => {
+    thingToTest.promiseThatRejects()
+    .catch((err) => {
+      let validationError;
+      try {
+        expect(err instanceof Error).to.equal(true);
+        expect(promiseRejectStub.callCount).to.equal(1);
+      } catch (caughtError) {
+        validationError = caughtError;
+      }
+      done(validationError);
+    });
+  });
+
 };
 
 // The call to incStateAsync includes a parameter (val)
@@ -96,21 +136,46 @@ const runSharedTests = (expectTargetFnCalls) => {
 // So we reset the state with resetState before each test.
 beforeEach(() => { thingToTest.resetState(); });
 
-const setupMocks = (mode) => {
+const reverseSerializer = (args) => {
+  const str = easyFix.stringifySafe(args, null, '');
+  return Array.from(str).reverse().join('');
+};
+
+const reverseDeserializer = (str) => {
+  const unreversed = Array.from(str).reverse().join('');
+  const args = JSON.parse(unreversed, null, '');
+  return args;
+};
+
+const setupMocks = (mode, useSerializers) => {
   beforeEach(() => {
     const options = {
       mode,
       sinon,
-      dir: 'tmp'
+      dir: 'tmp',
+      prefix: 'default-serializer'
     };
+    if (useSerializers) {
+      options.prefix = 'reverse-serializer';
+      options.argumentSerializer = reverseSerializer;
+      options.responseSerializer = reverseSerializer;
+      options.returnValueSerializer = reverseSerializer;
+      options.argumentDeserializer = reverseDeserializer;
+      options.responseDeserializer = reverseDeserializer;
+      options.returnValueDeserializer = reverseDeserializer;
+    }
     asyncStub = easyFix.wrapAsyncMethod(thingToTest, 'incStateAsync', options);
     promiseStub = easyFix.wrapAsyncMethod(thingToTest, 'incStatePromise', options);
+    causeErrorStub = easyFix.wrapAsyncMethod(thingToTest, 'causeAsyncError', options);
+    promiseRejectStub = easyFix.wrapAsyncMethod(thingToTest, 'promiseThatRejects', options);
   });
 };
 
 afterEach(() => {
   asyncStub.restore();
   promiseStub.restore();
+  causeErrorStub.restore();
+  promiseRejectStub.restore();
 });
 
 describe('wrapAsyncMethod (live mode)', () => {
@@ -120,6 +185,11 @@ describe('wrapAsyncMethod (live mode)', () => {
 
 describe('wrapAsyncMethod (capture mode)', () => {
   setupMocks('capture');
+  runSharedTests(true);
+});
+
+describe('wrapAsyncMethod (capture mode) with custom serializers', () => {
+  setupMocks('capture', true);
   runSharedTests(true);
 });
 
@@ -139,4 +209,9 @@ describe('wrapAsyncMethod (replay mode)', () => {
       done();
     });
   });
+});
+
+describe('wrapAsyncMethod (replay mode) with custom deserializers', () => {
+  setupMocks('replay', true);
+  runSharedTests(false);
 });

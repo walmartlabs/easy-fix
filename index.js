@@ -11,12 +11,15 @@ const modes = {
   replay: 'replay'
 };
 
+const mockFileCache = {};
+
 const HASH_LENGTH = 12;
 
 const NICE_ERR_HEADER = 'This test (in replay mode) could not read the expected mock data from'; // eslint-disable-line max-len
 const NICE_ERR_SERIALIZATION_DESCRIPTOR = 'Serialized arguments';
 const NICE_ERR_FOOTER = 'If you have not already, try running this test in capture mode to generate new test fixtures.  If you continue to see this error, a likely cause is differing (frequently changing) argument for the wrapped asynchronous task.  This can be mitigated by defining an argumentSerializer option that ignores the frequently-changing argument.'; // eslint-disable-line max-len
 const NICE_ERR_PROMISE = 'easy-fix retained no resolution/rejection arguments for this wrapped promise'; // eslint-disable-line max-len
+const NOTE = '(error reinstantiated by easy-fix)';
 
 const getNiceError = (file, details) => {
   return `${NICE_ERR_HEADER} "${file}"\n\n${NICE_ERR_SERIALIZATION_DESCRIPTOR}:\n${details}\n\n${NICE_ERR_FOOTER}`; // eslint-disable-line max-len
@@ -59,9 +62,11 @@ const stringifySafeSerializer = (replacer, cycleReplacer) => {
   };
 };
 
-const stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
+exports.stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
+
+const noop = (arg) => arg;
 
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
@@ -70,14 +75,28 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.dir = typeof optionsArg === 'string' ? optionsArg : optionsArg.dir || 'test/data';
   options.prefix = optionsArg.prefix || method;
   options.mode = optionsArg.mode || modes[process.env.TEST_MODE || modes.replay];
+  options.log = optionsArg.log;
+  if (optionsArg.reinstantiateErrors !== undefined) {
+    options.reinstantiateErrors = optionsArg.reinstantiateErrors;
+  } else {
+    options.reinstantiateErrors = true;
+  }
+  options.filepath = optionsArg.filepath;
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
     return origCallback;
   };
-  options.argumentSerializer = optionsArg.argumentSerializer || stringifySafe;
-  options.responseSerializer = optionsArg.responseSerializer || stringifySafe;
-  options.returnValueSerializer = optionsArg.returnValueSerializer || stringifySafe;
+  options.argumentSerializer = optionsArg.argumentSerializer || noop;
+  options.responseSerializer = optionsArg.responseSerializer || noop;
+  options.returnValueSerializer = optionsArg.returnValueSerializer || noop;
+
+  const responseDeserializer = optionsArg.responseDeserializer ||
+    (optionsArg.responseSerializer ? JSON.parse : noop);
+
+  const returnValueDeserializer = optionsArg.returnValueDeserializer ||
+    (optionsArg.returnValueSerializer ? JSON.parse : noop);
+
   options.sinon = optionsArg.sinon;
 
   const wrapper = function () {
@@ -89,22 +108,26 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       return originalFn.apply(self, callingArgs);
     }
 
-    const argStr = options.argumentSerializer(callingArgs);
+    const wrappedCallData = {
+      callArgs: options.argumentSerializer(callingArgs)
+    };
+    const argStr = exports.stringifySafe(wrappedCallData.callArgs);
     const hashKey =
       crypto
       .createHash('sha256')
       .update(argStr)
       .digest('hex')
       .slice(0, HASH_LENGTH);
-    const filepath = path.join(options.dir, `${options.prefix}-${hashKey}.json`);
-    const wrappedCallData = {
-      callArgs: argStr
-    };
+    const filepath = path.join(options.dir,
+      options.filepath || `${options.prefix}-${hashKey}.json`);
     const writeWrappedCallData = () => {
       fs.writeFileSync(
         filepath,
-        stringifySafe(wrappedCallData, null, '  ') + os.EOL,
+        exports.stringifySafe(wrappedCallData, null, '  ') + os.EOL,
         'utf8');
+      if (options.log) {
+        fs.appendFileSync(options.log, `wrote new mock ${filepath}\n`, 'utf8');
+      }
     };
 
     let origCallback;
@@ -112,12 +135,19 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       origCallback = options.callbackSwap.apply(self, [callingArgs, function () {
         const callbackArgs = Array.from(arguments);
         wrappedCallData.callbackArgs = options.responseSerializer(callbackArgs);
+        if (callbackArgs[0] instanceof Error) {
+          wrappedCallData.calledBackWithError = {
+            message: callbackArgs[0].message,
+            stack: callbackArgs[0].stack
+          };
+        }
         writeWrappedCallData();
         origCallback.apply(this, callbackArgs);
       }]);
     }
 
     if (options.mode === modes.capture) {
+      // mode is capture
       let returnValue = originalFn.apply(self, callingArgs);
       wrappedCallData.returnedPromise = returnValue && !!returnValue.then;
       if (wrappedCallData.returnedPromise) {
@@ -134,6 +164,12 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
           })
           .catch(function () {
             const promiseRejectionArgs = Array.from(arguments);
+            if (promiseRejectionArgs[0] instanceof Error) {
+              wrappedCallData.rejectedWithError = {
+                message: promiseRejectionArgs[0].message,
+                stack: promiseRejectionArgs[0].stack
+              };
+            }
             return new Promise((resolve, reject) => {
               wrappedCallData.promiseRejectionArgs =
                 options.responseSerializer(promiseRejectionArgs);
@@ -150,33 +186,57 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     // mode is replay
     let cannedData;
     try {
-      cannedData = fs.readFileSync(filepath, 'utf8');
+      if (!mockFileCache[filepath]) {
+        mockFileCache[filepath] = fs.readFileSync(filepath, 'utf8');
+      }
+      cannedData = mockFileCache[filepath];
     } catch (err) {
       if (err.code === 'ENOENT') {
+        if (options.log) {
+          fs.appendFileSync(options.log, `could not find ${filepath}\n`, 'utf8');
+        }
         throw new Error(getNiceError(filepath, argStr));
       }
       throw err;
     }
+    if (options.log) {
+      fs.appendFileSync(options.log, `read mock ${filepath}\n`, 'utf8');
+    }
     const cannedJson = JSON.parse(cannedData);
     if (cannedJson.callbackArgs) {
       process.nextTick(() => {
-        origCallback.apply(self, JSON.parse(cannedJson.callbackArgs));
+        const callbackArgs = responseDeserializer(cannedJson.callbackArgs);
+        if (options.reinstantiateErrors &&
+          cannedJson.calledBackWithError &&
+          callbackArgs[0] instanceof Error === false) {
+          callbackArgs[0] = new Error(`${cannedJson.calledBackWithError.message} ${NOTE}`);
+          callbackArgs[0].stack = cannedJson.calledBackWithError.stack;
+        }
+        origCallback.apply(self, callbackArgs);
       });
     }
     if (cannedJson.returnedPromise) {
       return new Promise((resolve, reject) => {
         process.nextTick(() => {
           if (cannedJson.promiseResolutionArgs) {
-            return resolve.apply(self, JSON.parse(cannedJson.promiseResolutionArgs));
+            return resolve.apply(self, responseDeserializer(cannedJson.promiseResolutionArgs));
           }
           if (cannedJson.promiseRejectionArgs) {
-            return reject.apply(self, JSON.parse(cannedJson.promiseRejectionArgs));
+            const promiseRejectionArgs = responseDeserializer(cannedJson.promiseRejectionArgs);
+            if (options.reinstantiateErrors &&
+              cannedJson.rejectedWithError &&
+              promiseRejectionArgs[0] instanceof Error === false) {
+              promiseRejectionArgs[0] =
+                new Error(`${cannedJson.rejectedWithError.message} ${NOTE}`);
+              promiseRejectionArgs[0].stack = cannedJson.rejectedWithError.stack;
+            }
+            return reject.apply(self, promiseRejectionArgs);
           }
           return reject(new Error(NICE_ERR_PROMISE));
         });
       });
     }
-    return JSON.parse(cannedJson.returnValue);
+    return returnValueDeserializer(cannedJson.returnValue);
   };
 
   if (options.sinon) {

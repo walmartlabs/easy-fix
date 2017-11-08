@@ -6,6 +6,18 @@ Opinions diverge on how to do integration testing.  One camp says: "mock your in
 
 Why choose?  This module helps integration tests capture and replay test data.  This allows tests to run in "live" mode, interacting with remote systems/db, or in "replay" mode, isolated to using serialized mock data, with no side effects. This is integration testing zen.
 
+NEW in v3
+---------
+Several new features include
+* better serialization for whitespace
+* Error reinstantiation
+* mock file access log
+* a file cache for mock data
+* named mock files
+
+Notes on the new options have been added below.
+See the [changelog](CHANGELOG.md) for more details.
+
 NEW in v2
 ---------
 Easy-fix v2 now supports promises!  See the [changelog](CHANGELOG.md) for details.
@@ -76,11 +88,21 @@ Modes are specified by the `TEST_MODE` environment variable, and they can be ove
 Options
 -------
 
-*  "dir": test data is written into this directory. This defaults to "test/data".
-*  "prefix": test data filenames are prefixed with this string. This defaults to the name of the target function.
-*  "mode": override the TEST_MODE environment variable.  In the absence of the TEST_MODE and this option, the mode defaults to "replay".
-*  "callbackSwap": allow an alternate function to monkey-patch the target function callback.  If the target function (under test) does not follow the nodejs convention of having a callback as it's last agument, you'll need to use this option to provide a custom function to swap the callbacks.
-*  "argumentSerializer":  allow an alternate serialization to JSON.stringify on the target function arguments.  Easy-fix will match responses to a hash of the serialized call arguments. This is useful for deduplicating test data where you expect the call arguments will be different for each call but do not require a unique response (perhaps for a timestamp or uuid).
-*  "responseSerializer":  allow an alternate serialization to JSON.stringify on the target function callback arguments.  This may be useful, for example, in removing details from a long response, if the test requires only some of the unaffected details.  Note that this argument applies to the callback arguments for Promise resolution/rejection as well as an asynchronous function callback.
-*  "returnValueSerializer":  allow an alternate serialization to JSON.stringify on the target function return value.  This may be useful, for example, in removing details from a long return value, if the test requires only some of the unaffected details.
+*  `dir: <string>`: test data is written into this directory. This defaults to "test/data".
+*  `prefix: <string>`: test data filenames are prefixed with this string. This defaults to the name of the target function.
+*  `mode: <replay | live | capture>`: override the TEST_MODE environment variable.  In the absence of the TEST_MODE and this option, the mode defaults to "replay".
+*  `callbackSwap: <function>`: allow an alternate function to monkey-patch the target function callback.  If the target function (under test) does not follow the nodejs convention of having a callback as it's last argument, you'll need to use this option to provide a custom function to swap the callbacks.
+*  `reinstantiateErrors: <boolean>`: if the first argument to a callback is an Errror, or the first argument for a rejected Promise is an Error, easy-fix will attempt to reinstantiate this Error (when in replay mode). Default is `true`.
+*  `filepath: <string>`: capture/replay a mock in the named file path (joined with the `dir` option).  This avoids the filename being derived from a hash of the calling arguments to the target function.
+*  `sinon: <sinon module>`: if your project uses sinon, you can pass in the module here, and the wrapped target function will be a sinon stub. This adds functionality to the easy-fix wrapped function object, but does not change the behavior of easy-fix.  Allowing sinon as an option avoids taking it as a dependency.
+*  `log: <filename>`: A file will be appended with lines describing the names of the mock files read and written.
+
+Options - serialization
+-----------------------
+
+*  `argumentSerializer: <function (argument_array)>`:  an alternate serialization of the target function arguments.  The default is a cycle-safe JSON serializer.  Easy-fix will match responses to a hash of the serialized call arguments. This is useful for deduplicating test data where you expect the call arguments will be different for each call but do not require a unique response (perhaps for a timestamp or uuid).
+*  `responseSerializer: <function (argument_array)>`:  use an alternate serialization of the target function callback arguments.  This may be useful, for example, in removing details from a long response, if the test requires only some of the unaffected details.  Note that this argument applies to the callback arguments for Promise resolution/rejection as well as an asynchronous function callback.
+*  `responseDeserializer: <function (string)>`:  use an alternate deserialization of the target function callback arguments.  The default is JSON.parse. This is typically only useful if you specify a responseSerializer. This may be useful to reinstantiate a derived Object or Error type, if needed.
+*  `returnValueSerializer: <function (argument_array)>`:  allow an alternate serialization to JSON.stringify on the target function return value.  This may be useful, for example, in removing details from a long return value, if the test requires only some of the unaffected details.
+*  `returnValueDeserializer: <function (string)>`:  use an alternate deserialization of the return value of the target function.  The default is JSON.parse. This is typically only useful if you specify a returnValueSerializer. This may be useful to reinstantiate a derived Object or Error type, if needed.
 
