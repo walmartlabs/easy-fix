@@ -10,6 +10,9 @@ rules:
   no-invalid-this: 0
   prefer-spread: 0
   no-magic-numbers: 0
+  complexity:
+    - 2
+    - 18
 
 extends:
   - "defaults/configurations/walmart/es6-node"

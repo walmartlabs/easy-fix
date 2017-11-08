@@ -19,6 +19,7 @@ const NICE_ERR_HEADER = 'This test (in replay mode) could not read the expected 
 const NICE_ERR_SERIALIZATION_DESCRIPTOR = 'Serialized arguments';
 const NICE_ERR_FOOTER = 'If you have not already, try running this test in capture mode to generate new test fixtures.  If you continue to see this error, a likely cause is differing (frequently changing) argument for the wrapped asynchronous task.  This can be mitigated by defining an argumentSerializer option that ignores the frequently-changing argument.'; // eslint-disable-line max-len
 const NICE_ERR_PROMISE = 'easy-fix retained no resolution/rejection arguments for this wrapped promise'; // eslint-disable-line max-len
+const NOTE = '(error reinstantiated by easy-fix)';
 
 const getNiceError = (file, details) => {
   return `${NICE_ERR_HEADER} "${file}"\n\n${NICE_ERR_SERIALIZATION_DESCRIPTOR}:\n${details}\n\n${NICE_ERR_FOOTER}`; // eslint-disable-line max-len
@@ -65,7 +66,7 @@ exports.stringifySafe = (obj, replacer, spaces, cycleReplacer) => {
   return JSON.stringify(obj, stringifySafeSerializer(replacer, cycleReplacer), spaces);
 };
 
-const noop = arg => arg;
+const noop = (arg) => arg;
 
 exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   const originalFn = obj[method];
@@ -80,6 +81,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   } else {
     options.reinstantiateErrors = true;
   }
+  options.filepath = optionsArg.filepath;
   options.callbackSwap = optionsArg.callbackSwap || function (args, newCallback) {
     const origCallback = args[args.length - 1];
     args[args.length - 1] = newCallback;
@@ -88,9 +90,6 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
   options.argumentSerializer = optionsArg.argumentSerializer || noop;
   options.responseSerializer = optionsArg.responseSerializer || noop;
   options.returnValueSerializer = optionsArg.returnValueSerializer || noop;
-
-  const argumentDeserializer = optionsArg.argumentDeserializer ||
-    (optionsArg.argumentSerializer ? JSON.parse : noop);
 
   const responseDeserializer = optionsArg.responseDeserializer ||
     (optionsArg.responseSerializer ? JSON.parse : noop);
@@ -119,7 +118,8 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
       .update(argStr)
       .digest('hex')
       .slice(0, HASH_LENGTH);
-    const filepath = path.join(options.dir, `${options.prefix}-${hashKey}.json`);
+    const filepath = path.join(options.dir,
+      options.filepath || `${options.prefix}-${hashKey}.json`);
     const writeWrappedCallData = () => {
       fs.writeFileSync(
         filepath,
@@ -166,8 +166,8 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
             const promiseRejectionArgs = Array.from(arguments);
             if (promiseRejectionArgs[0] instanceof Error) {
               wrappedCallData.rejectedWithError = {
-                message: callbackArgs[0].message,
-                stack: callbackArgs[0].stack
+                message: promiseRejectionArgs[0].message,
+                stack: promiseRejectionArgs[0].stack
               };
             }
             return new Promise((resolve, reject) => {
@@ -206,8 +206,10 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
     if (cannedJson.callbackArgs) {
       process.nextTick(() => {
         const callbackArgs = responseDeserializer(cannedJson.callbackArgs);
-        if (options.reinstantiateErrors && cannedJson.calledBackWithError && callbackArgs[0] instanceof Error === false) {
-          callbackArgs[0] = new Error(`${cannedJson.calledBackWithError.message} (error reinstantiated by easy-fix)`);
+        if (options.reinstantiateErrors &&
+          cannedJson.calledBackWithError &&
+          callbackArgs[0] instanceof Error === false) {
+          callbackArgs[0] = new Error(`${cannedJson.calledBackWithError.message} ${NOTE}`);
           callbackArgs[0].stack = cannedJson.calledBackWithError.stack;
         }
         origCallback.apply(self, callbackArgs);
@@ -221,8 +223,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
           }
           if (cannedJson.promiseRejectionArgs) {
             const promiseRejectionArgs = responseDeserializer(cannedJson.promiseRejectionArgs);
-            if (options.reinstantiateErrors && cannedJson.rejectedWithError && promiseRejectionArgs[0] instanceof Error === false) {
-              promiseRejectionArgs[0] = new Error(`${cannedJson.rejectedWithError.message} (error reinstantiated by easy-fix)`);
+            if (options.reinstantiateErrors &&
+              cannedJson.rejectedWithError &&
+              promiseRejectionArgs[0] instanceof Error === false) {
+              promiseRejectionArgs[0] =
+                new Error(`${cannedJson.rejectedWithError.message} ${NOTE}`);
               promiseRejectionArgs[0].stack = cannedJson.rejectedWithError.stack;
             }
             return reject.apply(self, promiseRejectionArgs);
