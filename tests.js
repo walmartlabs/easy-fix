@@ -4,9 +4,11 @@
 const sinon = require('sinon');
 const expect = require('chai').expect;
 const easyFix = require('./index');
+const stream = require('stream');
 
 const expectedReturnValue = 'I am a function return value';
 const errorMessage = 'This is a predictable error';
+const expectedStreamingValue = 'This string gets streamed in chunks';
 const thingToTest = {
   state: 0,
   incStateAsync: (stateArg, callback) => {
@@ -40,6 +42,21 @@ const thingToTest = {
       });
     });
   },
+  streamSomething: () => {
+    const stringStream = new stream.PassThrough();
+    let streamIndex = 0;
+    const continueSreaming = () => {
+      if (streamIndex < expectedStreamingValue.length) {
+        stringStream.push(expectedStreamingValue[streamIndex]);
+        streamIndex += 1;
+        setTimeout(continueSreaming, 5);
+        return;
+      }
+      stringStream.push(null);
+    };
+    continueSreaming();
+    return stringStream;
+  },
   resetState: () => {
     thingToTest.state = 0;
   }
@@ -49,6 +66,7 @@ let asyncStub;
 let promiseStub;
 let causeErrorStub;
 let promiseRejectStub;
+let streamStub;
 const runSharedTests = (expectTargetFnCalls) => {
 
   it('falls back onto wrapped method', (done) => {
@@ -128,6 +146,18 @@ const runSharedTests = (expectTargetFnCalls) => {
     });
   });
 
+  it('handles a return value that does async work, like a stream', (done) => {
+    const stringStream = thingToTest.streamSomething();
+    const chunks = [];
+    stringStream.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    stringStream.on('end', () => {
+      const body = Buffer.concat(chunks).toString();
+      expect(body).to.equal(expectedStreamingValue);
+      done();
+    });
+  });
 };
 
 // The call to incStateAsync includes a parameter (val)
@@ -152,11 +182,9 @@ const setupMocks = (mode, useSerializers) => {
     const options = {
       mode,
       sinon,
-      dir: 'tmp',
-      prefix: 'default-serializer'
+      dir: 'tmp'
     };
     if (useSerializers) {
-      options.prefix = 'reverse-serializer';
       options.argumentSerializer = reverseSerializer;
       options.responseSerializer = reverseSerializer;
       options.returnValueSerializer = reverseSerializer;
@@ -168,6 +196,28 @@ const setupMocks = (mode, useSerializers) => {
     promiseStub = easyFix.wrapAsyncMethod(thingToTest, 'incStatePromise', options);
     causeErrorStub = easyFix.wrapAsyncMethod(thingToTest, 'causeAsyncError', options);
     promiseRejectStub = easyFix.wrapAsyncMethod(thingToTest, 'promiseThatRejects', options);
+
+    // a streaming return type requires some custom handling:
+    streamStub = easyFix.wrapAsyncMethod(thingToTest, 'streamSomething',
+      Object.assign({}, options, {
+        returnValueSerializer: (stringStream, callback) => {
+          const chunks = [];
+          stringStream.on('data', (chunk) => {
+            chunks.push(chunk);
+          });
+          stringStream.on('end', () => {
+            const body = Buffer.concat(chunks).toString();
+            callback(body);
+          });
+        },
+        returnValueDeserializer: (returnValue, returnValueAsyncCallbackArgs) => {
+          const stringStream = new stream.PassThrough();
+          stringStream.push(returnValueAsyncCallbackArgs[0]);
+          stringStream.push(null);
+          return stringStream;
+        }
+      })
+    );
   });
 };
 
@@ -176,6 +226,7 @@ afterEach(() => {
   promiseStub.restore();
   causeErrorStub.restore();
   promiseRejectStub.restore();
+  streamStub.restore();
 });
 
 describe('wrapAsyncMethod (live mode)', () => {
@@ -215,3 +266,4 @@ describe('wrapAsyncMethod (replay mode) with custom deserializers', () => {
   setupMocks('replay', true);
   runSharedTests(false);
 });
+

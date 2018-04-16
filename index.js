@@ -178,7 +178,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
             });
           });
       } else {
-        wrappedCallData.returnValue = options.returnValueSerializer(returnValue);
+        wrappedCallData.returnValue = options.returnValueSerializer(returnValue, function () {
+          const returnValueAsyncCallbackArgs = Array.from(arguments);
+          wrappedCallData.returnValueAsyncCallbackArgs = returnValueAsyncCallbackArgs;
+          writeWrappedCallData();
+        });
       }
       return returnValue;
     }
@@ -236,7 +240,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         });
       });
     }
-    return returnValueDeserializer(cannedJson.returnValue);
+    return returnValueDeserializer(cannedJson.returnValue, cannedJson.returnValueAsyncCallbackArgs);
   };
 
   if (options.sinon) {
