@@ -20,6 +20,7 @@ const thingToTest = {
   causeAsyncError: (callback) => {
     process.nextTick(() => {
       const error = new Error(errorMessage);
+      error.otherProperty = 'blah';
       callback(error);
     });
     return expectedReturnValue;
@@ -36,7 +37,9 @@ const thingToTest = {
   promiseThatRejects: () => {
     return new Promise((resolve, reject) => {
       process.nextTick(() => {
-        reject(new Error(errorMessage));
+        const err = new Error(errorMessage);
+        err.otherProperty = 'blah';
+        reject(err);
       });
     });
   },
@@ -67,6 +70,14 @@ const runSharedTests = (expectTargetFnCalls) => {
       expect(foundReturnValue).to.equal(expectedReturnValue);
       expect(err instanceof Error).to.equal(true);
       expect(causeErrorStub.callCount).to.equal(1);
+      done();
+    });
+  });
+
+  it('additional properties are present on errors', (done) => {
+    thingToTest.causeAsyncError((err) => {
+      expect(err.stack).to.not.include('easy-fix/index.js');
+      expect(err.otherProperty).to.eql('blah');
       done();
     });
   });
@@ -125,6 +136,16 @@ const runSharedTests = (expectTargetFnCalls) => {
         validationError = caughtError;
       }
       done(validationError);
+    });
+  });
+
+  it('attaches correct stack and metadata to error', () => {
+    return thingToTest.promiseThatRejects()
+    .catch((err) => {
+      expect(err instanceof Error).to.equal(true);
+      expect(promiseRejectStub.callCount).to.equal(1);
+      expect(err.stack).to.not.include('easy-fix/index.js');
+      expect(err.otherProperty).to.eql('blah');
     });
   });
 
