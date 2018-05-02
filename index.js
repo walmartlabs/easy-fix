@@ -178,7 +178,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
             });
           });
       } else {
-        wrappedCallData.returnValue = options.returnValueSerializer(returnValue);
+        wrappedCallData.returnValue = options.returnValueSerializer(returnValue, function () {
+          const returnValueAsyncCallbackArgs = Array.from(arguments);
+          wrappedCallData.returnValueAsyncCallbackArgs = returnValueAsyncCallbackArgs;
+          writeWrappedCallData();
+        });
       }
       return returnValue;
     }
@@ -209,8 +213,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         if (options.reinstantiateErrors &&
           cannedJson.calledBackWithError &&
           callbackArgs[0] instanceof Error === false) {
-          callbackArgs[0] = new Error(`${cannedJson.calledBackWithError.message} ${NOTE}`);
-          callbackArgs[0].stack = cannedJson.calledBackWithError.stack;
+          const err = new Error(`${cannedJson.calledBackWithError.message} ${NOTE}`);
+          // Errors may contain additional properties that we'll want to write back
+          Object.assign(err, callbackArgs[0]);
+          err.stack = cannedJson.calledBackWithError.stack;
+          callbackArgs[0] = err;
         }
         origCallback.apply(self, callbackArgs);
       });
@@ -226,9 +233,11 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
             if (options.reinstantiateErrors &&
               cannedJson.rejectedWithError &&
               promiseRejectionArgs[0] instanceof Error === false) {
-              promiseRejectionArgs[0] =
-                new Error(`${cannedJson.rejectedWithError.message} ${NOTE}`);
-              promiseRejectionArgs[0].stack = cannedJson.rejectedWithError.stack;
+              const err = new Error(`${cannedJson.rejectedWithError.message} ${NOTE}`);
+              // Errors may contain additional properties that we'll want to write back
+              Object.assign(err, promiseRejectionArgs[0]);
+              err.stack = cannedJson.rejectedWithError.stack;
+              promiseRejectionArgs[0] = err;
             }
             return reject.apply(self, promiseRejectionArgs);
           }
@@ -236,7 +245,7 @@ exports.wrapAsyncMethod = function (obj, method, optionsArg) {
         });
       });
     }
-    return returnValueDeserializer(cannedJson.returnValue);
+    return returnValueDeserializer(cannedJson.returnValue, cannedJson.returnValueAsyncCallbackArgs);
   };
 
   if (options.sinon) {

@@ -1,3 +1,12 @@
+NEW in v3.1: Async hook for mocked call return type serializer/deserializer
+===========================================================================
+Easy-fix supports options to customize the mock/fixture values. This is achieved by allowing functions to be passed in (as named options) that control the serialization/deserialization of the target function call return value and callback/Promise resolution arguments.
+
+While this works for most use-cases, there is an important use-case that has not yet been supported.  The target function may start some asynchronous work which is not captured by a callback or a Promise, but rather by returning some object that produces the result later.  An example of this is an an HTTP request which returns a Stream object representing the response to the request. As the easy-fix options of `returnValueSerializer` and `returnValueDeserializer` work synchronously, there is no clear and easy way to serialize the asynchronous result of such a stream object into the mock file.
+
+This is improved in easy-fix 3.1, which provides an additional parameter to the `returnValueSerializer`.  The additional parameter is a callback, and the arguments of that callback are written into the mock file.  Accordingly, as tests are replayed, these values are read from the mock files and passed into the `returnValueDeserializer` as a new, second argument.
+
+
 NEW in v3: Workflow features
 ============================
 
